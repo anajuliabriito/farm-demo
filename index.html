@@ -1,0 +1,651 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Muster Farm App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: a control strip over a single phone, phone scaled to fit. "Screen only" fills the viewport with the app for green-screen overlays. */
+:root{
+  --ground:#E6EAE3; --surface:#FFFFFF; --surface-2:#F2F4EF; --ink:#18201B; --muted:#5D6A61; --line:#DCE2D9;
+  --accent:#2C6A53; --accent-soft:#DFEDE5; --on-accent:#FFFFFF;
+  --warn:#A86E14; --warn-soft:#F8ECD6; --crit:#B0382A; --crit-soft:#F8E1DD;
+  --frame:#1B1F1C; --tap:rgba(44,106,83,.35);
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0F1311; --surface:#191F1B; --surface-2:#222A25; --ink:#E6ECE5; --muted:#97A59B; --line:#2E3832;
+  --accent:#6DBB9A; --accent-soft:#1D3A2F; --on-accent:#0E1A14;
+  --warn:#E3AA4E; --warn-soft:#3A2E17; --crit:#F07C6A; --crit-soft:#41221D;
+  --frame:#000; --tap:rgba(109,187,154,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ground:#0F1311; --surface:#191F1B; --surface-2:#222A25; --ink:#E6ECE5; --muted:#97A59B; --line:#2E3832;
+  --accent:#6DBB9A; --accent-soft:#1D3A2F; --on-accent:#0E1A14;
+  --warn:#E3AA4E; --warn-soft:#3A2E17; --crit:#F07C6A; --crit-soft:#41221D;
+  --frame:#000; --tap:rgba(109,187,154,.35); color-scheme:dark}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;margin:0;overflow:hidden}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.stage{height:100%;display:flex;flex-direction:column;align-items:center;padding-inline:16px;padding-block:12px;gap:12px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;max-width:720px}
+.controls .hint{color:var(--muted);font-size:13px;flex-basis:100%;text-align:center}
+.cbtn{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px}
+.cbtn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.fit{flex:1;min-height:0;width:100%;display:flex;justify-content:center}
+.holder{position:relative}
+.phone{position:absolute;top:0;left:0;width:390px;height:844px;border-radius:54px;background:var(--frame);padding:12px;transform-origin:top left;box-shadow:0 30px 60px -20px rgba(0,0,0,.35)}
+.screen{position:relative;width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--surface-2)}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:118px;height:32px;background:#000;border-radius:20px;z-index:50}
+
+body.bare .controls{display:none}
+body.bare .stage{padding:0}
+body.bare .holder{width:100%!important;height:100%!important}
+body.bare .phone{position:static;transform:none!important;width:100%;height:100%;padding:0;border-radius:0;box-shadow:none;background:none}
+body.bare .screen{border-radius:0}
+body.bare .notch{display:none}
+.exitbare{position:fixed;right:10px;bottom:10px;z-index:99;opacity:.0;font-size:12px}
+body.bare .exitbare{display:block}
+.exitbare{display:none}
+.exitbare:hover,.exitbare:focus-visible{opacity:1}
+
+.sbar{position:absolute;top:0;left:0;right:0;height:50px;display:flex;align-items:center;justify-content:space-between;padding:4px 30px 0;font-weight:600;font-size:15px;z-index:40;pointer-events:none}
+.sbar.light{color:#fff}
+.sbar .icons{display:flex;gap:6px;align-items:center}
+.sbar svg{display:block}
+
+.scr{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--surface-2);transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .35s;will-change:transform}
+.scr.off-r,.scr.off-l,.scr.fade{pointer-events:none}
+.scr.off-r{transform:translateX(100%)}
+.scr.off-l{transform:translateX(-28%);opacity:0}
+.scr.fade{opacity:0;transform:none}
+@media (prefers-reduced-motion: reduce){.scr{transition:none}}
+.scroll{flex:1;overflow-y:auto;padding:58px 16px 20px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.scroll.withtabs{padding-bottom:96px}
+
+.topbar{display:flex;align-items:center;gap:8px;min-height:36px}
+.back{display:flex;align-items:center;gap:2px;color:var(--accent);font-weight:600;padding:4px 0}
+.h1{font-family:var(--display);font-weight:700;font-size:30px;line-height:1.05;margin:0;text-wrap:balance}
+.h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:14px;margin:0}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.num{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
+
+.card{background:var(--surface);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line)}
+.card.tap{text-align:left;width:100%}
+.card.tap:active{transform:scale(.985)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{gap:4px;min-height:118px}
+.tile .num{font-size:36px;line-height:1}
+.tile .num small{font-size:18px;color:var(--muted);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12.5px;font-weight:600;width:max-content}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.row{display:flex;align-items:center;gap:10px}
+.row .grow{flex:1;min-width:0}
+.todo{display:flex;flex-direction:column;gap:0}
+.todo .item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);text-align:left;width:100%}
+.todo .item:first-child{border-top:0;padding-top:2px}
+.stripe{width:4px;align-self:stretch;border-radius:4px;flex:none}
+.stripe.crit{background:var(--crit)}.stripe.warn{background:var(--warn)}.stripe.ok{background:var(--accent)}
+.chev{color:var(--muted);flex:none}
+.bar{height:10px;border-radius:6px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:6px;background:var(--accent)}
+.bar i.crit{background:var(--crit)}.bar i.warn{background:var(--warn)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{padding:9px 0;border-top:1px solid var(--line);text-align:right;font-size:14.5px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;border-top:0;padding-top:0}
+td:first-child,th:first-child{text-align:left}
+.neg{color:var(--crit);font-weight:600}.pos{color:var(--accent);font-weight:600}
+.note{font-size:13.5px;color:var(--muted);line-height:1.45;margin:0}
+.spark{width:100%;height:56px;display:block}
+.btn{display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;border-radius:14px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:16px;width:100%}
+.btn.ghost{background:var(--surface);color:var(--accent);border:1px solid var(--line)}
+
+.tabs{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 10px 26px;z-index:30}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);flex:1}
+.tab.on{color:var(--accent)}
+.tab .badge{position:absolute;margin-left:22px;margin-top:-4px;background:var(--crit);color:#fff;font-size:10px;border-radius:9px;padding:1px 5px}
+.tab span.ic{position:relative;display:flex}
+
+/* lock screen */
+#lock{background:linear-gradient(180deg,#26334a 0%,#7a5c6e 48%,#d9925a 78%,#efc27a 100%);color:#fff}
+#lock .wrap{flex:1;display:flex;flex-direction:column;align-items:center;padding:86px 14px 30px;gap:6px}
+#lock .date{font-weight:600;font-size:18px;opacity:.9}
+#lock .time{font-family:var(--display);font-weight:600;font-size:96px;line-height:.95;letter-spacing:-1px}
+#lock .hills{position:absolute;left:0;right:0;bottom:0;height:34%;pointer-events:none}
+.notif{margin-top:auto;width:100%;background:rgba(255,255,255,.78);color:#17201a;border-radius:22px;padding:12px 14px;display:flex;gap:10px;text-align:left;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:relative;z-index:2;margin-bottom:120px}
+.appic{width:38px;height:38px;border-radius:10px;background:#2C6A53;display:grid;place-items:center;flex:none}
+.notif .t{display:flex;justify-content:space-between;font-size:13px;color:#4a564e}
+.notif b{font-size:15px}
+.notif p{margin:2px 0 0;font-size:14.5px;line-height:1.35}
+
+/* sms */
+#sms{background:var(--surface)}
+.smshead{padding:54px 16px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;border-bottom:1px solid var(--line);background:var(--surface)}
+.smshead .av{width:52px;height:52px;border-radius:50%;background:var(--accent);display:grid;place-items:center}
+.smshead b{font-size:14px}
+.thread{flex:1;overflow-y:auto;padding:14px 12px 20px;display:flex;flex-direction:column;gap:8px}
+.stamp{text-align:center;font-size:12px;color:var(--muted);margin:6px 0 2px}
+.bub{max-width:82%;background:var(--surface-2);border-radius:20px;border-bottom-left-radius:6px;padding:10px 13px;font-size:15.5px;line-height:1.38;border:1px solid var(--line)}
+.bub a,.bub .lnk{color:#1f6fd6;text-decoration:underline;font-weight:500}
+.bub.me{align-self:flex-end;background:#2F80ED;color:#fff;border:0;border-bottom-left-radius:20px;border-bottom-right-radius:6px}
+.smsbar{display:flex;gap:8px;padding:10px 12px 30px;border-top:1px solid var(--line)}
+.smsbar div{flex:1;border:1px solid var(--line);border-radius:20px;padding:8px 14px;color:var(--muted)}
+
+/* login */
+.auth{flex:1;display:flex;flex-direction:column;padding:96px 24px 40px;gap:18px;background:var(--surface)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .num{font-size:30px;letter-spacing:.5px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600;color:var(--muted)}
+.input{border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;font-size:16px;min-height:50px;background:var(--surface-2)}
+.input.focus{border-color:var(--accent)}
+.caret::after{content:"";display:inline-block;width:2px;height:18px;background:var(--accent);vertical-align:-3px;margin-left:1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.otp{display:flex;gap:8px;justify-content:space-between}
+.otp div{flex:1;aspect-ratio:.82;max-width:52px;border:1.5px solid var(--line);border-radius:12px;display:grid;place-items:center;font-family:var(--display);font-size:28px;font-weight:700;background:var(--surface-2)}
+.otp div.f{border-color:var(--accent)}
+.lockline{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+
+/* live */
+.feed{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:3/4;max-width:100%}
+.feed canvas{width:100%;height:100%;display:block}
+.ov{position:absolute;left:10px;right:10px;display:flex;justify-content:space-between;gap:6px;pointer-events:none}
+.ov.t{top:10px}.ov.b{bottom:10px}
+.chip{background:rgba(0,0,0,.55);color:#fff;font-size:12.5px;font-weight:600;padding:4px 9px;border-radius:8px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
+.chip .rec{width:8px;height:8px;border-radius:50%;background:#ff4d3d;animation:blink 1.2s steps(1) infinite}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{flex:1;padding:8px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--on-accent)}
+.steps .s{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14.5px}
+.steps .s:first-child{border-top:0}
+.tick{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12px;font-weight:700}
+.tick.done{background:var(--accent);color:var(--on-accent)}
+.tick.now{border:2px solid var(--accent);position:relative}
+.tick.now::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);animation:blink 1s steps(1) infinite}
+.tick.todo{border:2px solid var(--line)}
+
+.taprip{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:var(--tap);pointer-events:none;z-index:60;animation:rip .55s ease-out forwards}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.5);opacity:0}}
+.photo{border-radius:12px;overflow:hidden;background:#000}
+.photo svg{display:block;width:100%;height:auto}
+</style>
+
+<div class="stage">
+  <div class="controls" id="controls">
+    <button class="cbtn primary" id="tourBtn">▶ Play auto tour</button>
+    <button class="cbtn" id="resetBtn">Restart from text alert</button>
+    <button class="cbtn" id="bareBtn">Screen only</button>
+    <div class="hint">Tap through it yourself, or press Play and screen record. "Screen only" hides the phone frame so you can drop it onto a green screen. Press Esc to bring these buttons back.</div>
+  </div>
+  <div class="fit" id="fit">
+    <div class="holder" id="holder">
+      <div class="phone" id="phone">
+        <div class="screen" id="screen">
+          <div class="notch"></div>
+          <div class="sbar" id="sbar"><span id="clock">6:19</span><span class="icons">
+            <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="22" height="12" rx="3.5" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/><rect x="23.5" y="4" width="2" height="5" rx="1" fill="currentColor" opacity=".5"/></svg>
+          </span></div>
+
+          <!-- LOCK -->
+          <section class="scr" id="lock">
+            <svg class="hills" viewBox="0 0 390 280" preserveAspectRatio="none"><path d="M0 120 C80 70 150 110 220 80 C290 50 340 90 390 70 L390 280 L0 280Z" fill="#3a4a35" opacity=".85"/><path d="M0 180 C90 140 170 170 250 150 C320 132 360 150 390 140 L390 280 L0 280Z" fill="#26321f"/><g fill="#1b2416"><ellipse cx="96" cy="188" rx="9" ry="4"/><ellipse cx="118" cy="194" rx="8" ry="3.5"/><ellipse cx="270" cy="168" rx="8" ry="3.5"/><ellipse cx="286" cy="172" rx="7" ry="3"/></g></svg>
+            <div class="wrap">
+              <div class="date">Wednesday 7 October</div>
+              <div class="time">6:19</div>
+              <button class="notif" id="notif" data-go="sms">
+                <div class="appic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/></svg></div>
+                <div class="grow" style="min-width:0">
+                  <div class="t"><b>Muster</b><span>now</span></div>
+                  <p>Morning Patty. Today's run is done. Cattle 184 of 186. Trough 3 is low (18%). Possible fence gap on Back Hill.</p>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <!-- SMS -->
+          <section class="scr off-r" id="sms">
+            <div class="smshead">
+              <div class="av"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/></svg></div>
+              <b>Muster · Patty's farm</b>
+            </div>
+            <div class="thread">
+              <div class="stamp">Yesterday 6:21 am</div>
+              <div class="bub">Morning Patty. Run done at 6:21am. Cattle 186 of 186. All 4 troughs OK. Feed: about 3 days left in Bunk B. Fence clear.</div>
+              <div class="bub me">👍</div>
+              <div class="stamp">Today 5:51 am</div>
+              <div class="bub"><b>ALERT</b> Trough 3 (Creek paddock) is at 18%. It was 71% yesterday. Could be the float valve or a leak.</div>
+              <div class="stamp">Today 6:18 am</div>
+              <div class="bub">Morning Patty. Today's run is done.<br>• Cattle 184 of 186 (2 fewer on Back Hill)<br>• Trough 3 low, 18%<br>• Possible fence gap, Back Hill east<br>• Feed OK, about 2 days in Bunk B<br>Full results: <span class="lnk" id="smslink" role="button" tabindex="0" data-go="login">muster.app/r/1007</span></div>
+            </div>
+            <div class="smsbar"><div>Text Message</div></div>
+          </section>
+
+          <!-- LOGIN -->
+          <section class="scr off-r" id="login">
+            <div class="auth">
+              <div class="brand"><div class="appic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/></svg></div><span class="num">MUSTER</span></div>
+              <div><h1 class="h1">Sign in to Patty's farm</h1><p class="sub">Daily drone results for your paddocks.</p></div>
+              <div class="field"><label>Email</label><div class="input" id="em"></div></div>
+              <div class="field"><label>Password</label><div class="input" id="pw"></div></div>
+              <button class="btn" id="signin" data-go="code">Sign in</button>
+              <div class="lockline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Protected with a one-time code on every new device</div>
+            </div>
+          </section>
+
+          <!-- CODE -->
+          <section class="scr off-r" id="code">
+            <div class="auth">
+              <div class="topbar"><button class="back" data-back>‹ Back</button></div>
+              <div><h1 class="h1">Check your texts</h1><p class="sub">We sent a 6-digit code to the mobile ending 418.</p></div>
+              <div class="otp" id="otp"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+              <button class="btn" id="verify" data-go="today" data-root>Verify</button>
+              <div class="lockline">Codes expire after 5 minutes.</div>
+            </div>
+          </section>
+
+          <!-- TODAY -->
+          <section class="scr off-r" id="today">
+            <div class="scroll withtabs" id="todayScroll">
+              <div class="row" style="align-items:flex-end">
+                <div class="grow"><div class="label">Wed 7 Oct · Dock 1</div><h1 class="h1">Patty's farm</h1></div>
+                <span class="pill ok"><span class="dot"></span>Run complete</span>
+              </div>
+              <p class="sub" style="margin-top:-6px">Flew 5:42 to 6:18am · 36 min · 4 paddocks</p>
+
+              <div class="card">
+                <div class="label">Needs you today</div>
+                <div class="todo">
+                  <button class="item" data-go="water" id="todoTrough"><span class="stripe crit"></span><span class="grow"><b>Trough 3 is low, 18%</b><br><span class="sub">Creek paddock · was 71% yesterday</span></span><span class="chev">›</span></button>
+                  <button class="item" data-go="fence"><span class="stripe crit"></span><span class="grow"><b>Possible fence gap</b><br><span class="sub">Back Hill, east boundary · photo at 6:07am</span></span><span class="chev">›</span></button>
+                </div>
+              </div>
+
+              <div class="grid2">
+                <button class="card tap tile" data-go="cattle" id="tileCattle">
+                  <span class="label">Cattle</span>
+                  <span class="num">184<small> /186</small></span>
+                  <span class="pill warn">−2 vs yesterday</span>
+                </button>
+                <button class="card tap tile" data-go="water" id="tileWater">
+                  <span class="label">Water</span>
+                  <span class="num">3<small> of 4 OK</small></span>
+                  <span class="pill crit">Trough 3 low</span>
+                </button>
+                <button class="card tap tile" data-go="feed" id="tileFeed">
+                  <span class="label">Feed bunks</span>
+                  <span class="num">2<small> days left</small></span>
+                  <span class="pill ok">Bunk B first</span>
+                </button>
+                <button class="card tap tile" data-go="fence" id="tileFence">
+                  <span class="label">Fence</span>
+                  <span class="num">4.1<small> km checked</small></span>
+                  <span class="pill crit">1 possible gap</span>
+                </button>
+              </div>
+
+              <div class="card">
+                <div class="row"><span class="label grow">Heat and welfare</span><span class="pill warn">Moderate</span></div>
+                <div class="row"><span class="num" style="font-size:34px">31°C</span><span class="sub grow">Heat index by midday. Shade on Creek and North Flat.</span></div>
+                <div class="row" style="border-top:1px solid var(--line);padding-top:10px">
+                  <span class="stripe warn"></span>
+                  <span class="grow"><b>1 animal to look at</b><br><span class="sub">Lying apart from the herd at dawn, Creek paddock. A flag to check, not a diagnosis.</span></span>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="label">Changes from yesterday</div>
+                <table>
+                  <tr><td>Cattle on Back Hill</td><td class="neg">−3</td></tr>
+                  <tr><td>Cattle on Creek</td><td class="pos">+1</td></tr>
+                  <tr><td>Trough 3 level</td><td class="neg">−53%</td></tr>
+                  <tr><td>Feed in bunks</td><td>−2.4 m³</td></tr>
+                </table>
+              </div>
+              <button class="btn ghost" data-tab="live">Watch the drone live</button>
+            </div>
+          </section>
+
+          <!-- CATTLE -->
+          <section class="scr off-r" id="cattle">
+            <div class="scroll">
+              <div class="topbar"><button class="back" data-back>‹ Today</button></div>
+              <h1 class="h1">Cattle count</h1>
+              <div class="card">
+                <div class="row"><span class="num" style="font-size:44px">184</span><span class="grow sub">of 186 expected<br>Thermal pass at 5:48am</span><span class="pill warn">−2</span></div>
+                <svg class="spark" viewBox="0 0 300 56" id="spCattle"></svg>
+                <div class="row sub" style="justify-content:space-between;font-size:12px"><span>1 Oct</span><span>7 Oct</span></div>
+              </div>
+              <div class="card">
+                <div class="label">By paddock</div>
+                <table>
+                  <tr><th>Paddock</th><th>Today</th><th>Yesterday</th><th>Change</th></tr>
+                  <tr><td>North Flat</td><td>72</td><td>72</td><td>0</td></tr>
+                  <tr><td>Creek</td><td>58</td><td>57</td><td class="pos">+1</td></tr>
+                  <tr><td>Back Hill</td><td>41</td><td>44</td><td class="neg">−3</td></tr>
+                  <tr><td>Yards</td><td>13</td><td>13</td><td>0</td></tr>
+                  <tr><td><b>Total</b></td><td><b>184</b></td><td><b>186</b></td><td class="neg">−2</td></tr>
+                </table>
+              </div>
+              <p class="note">Cattle under thick tree cover can be missed. Back Hill has a fence alert today, so 2 head may have pushed through. Tomorrow's run recounts Back Hill first.</p>
+            </div>
+          </section>
+
+          <!-- WATER -->
+          <section class="scr off-r" id="water">
+            <div class="scroll">
+              <div class="topbar"><button class="back" data-back>‹ Today</button></div>
+              <h1 class="h1">Water troughs</h1>
+              <div class="card">
+                <div class="row"><b class="grow">Trough 3 · Creek</b><span class="pill crit">18%</span></div>
+                <div class="photo"><svg viewBox="0 0 320 180"><rect width="320" height="180" fill="#6b7d45"/><g opacity=".35" fill="#3f4f24"><circle cx="40" cy="30" r="22"/><circle cx="280" cy="150" r="30"/><circle cx="250" cy="30" r="14"/></g><path d="M0 120 Q80 100 160 118 T320 110" stroke="#8a7a55" stroke-width="18" fill="none" opacity=".6"/><circle cx="160" cy="88" r="46" fill="#8f9396"/><circle cx="160" cy="88" r="40" fill="#5b5f55"/><ellipse cx="160" cy="98" rx="30" ry="18" fill="#4f7f95"/><rect x="118" y="44" width="84" height="88" fill="none" stroke="#7CF2B8" stroke-width="2"/><rect x="118" y="30" width="96" height="16" fill="#7CF2B8"/><text x="123" y="42" font-size="11" font-family="Barlow, sans-serif" font-weight="700" fill="#0d2a1e">trough · water 18%</text><g fill="#3b2a1f"><ellipse cx="240" cy="70" rx="12" ry="6" transform="rotate(-20 240 70)"/><ellipse cx="60" cy="130" rx="12" ry="6" transform="rotate(15 60 130)"/></g></svg></div>
+                <svg class="spark" viewBox="0 0 300 56" id="spTrough"></svg>
+                <p class="note">Dropped from 71% to 18% overnight. A fast drop usually means a stuck float valve or a leak.</p>
+              </div>
+              <div class="card" style="gap:12px">
+                <div class="label">All troughs</div>
+                <div><div class="row"><span class="grow">Trough 1 · North Flat</span><b>92%</b></div><div class="bar"><i style="width:92%"></i></div></div>
+                <div><div class="row"><span class="grow">Trough 2 · Yards</span><b>64%</b></div><div class="bar"><i style="width:64%"></i></div></div>
+                <div><div class="row"><span class="grow">Trough 3 · Creek</span><b style="color:var(--crit)">18%</b></div><div class="bar"><i class="crit" style="width:18%"></i></div></div>
+                <div><div class="row"><span class="grow">Trough 4 · Back Hill</span><b>81%</b></div><div class="bar"><i style="width:81%"></i></div></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- FEED -->
+          <section class="scr off-r" id="feed">
+            <div class="scroll">
+              <div class="topbar"><button class="back" data-back>‹ Today</button></div>
+              <h1 class="h1">Feed bunks</h1>
+              <p class="sub" style="margin-top:-6px">Measured from the 3D mapping pass at 5:56am</p>
+              <div class="card" style="gap:12px">
+                <div><div class="row"><span class="grow"><b>Bunk A</b> · North Flat</span><span class="num" style="font-size:22px">6.8 m³</span></div><div class="bar"><i style="width:68%"></i></div><p class="note">About 3 days at current use</p></div>
+                <div><div class="row"><span class="grow"><b>Bunk B</b> · Creek</span><span class="num" style="font-size:22px">2.9 m³</span></div><div class="bar"><i class="warn" style="width:29%"></i></div><p class="note">About 2 days at current use. Refill this one first.</p></div>
+              </div>
+              <div class="card"><div class="label">Used yesterday</div><div class="num" style="font-size:30px">2.4 m³</div><p class="note">In line with the 7-day average of 2.3 m³.</p></div>
+            </div>
+          </section>
+
+          <!-- FENCE -->
+          <section class="scr off-r" id="fence">
+            <div class="scroll">
+              <div class="topbar"><button class="back" data-back>‹ Today</button></div>
+              <h1 class="h1">Fence line</h1>
+              <div class="card">
+                <svg viewBox="0 0 320 220" style="width:100%;height:auto;display:block">
+                  <rect width="320" height="220" rx="12" fill="var(--surface-2)"/>
+                  <g fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round">
+                    <path d="M20 20 H170 V110 H20 Z"/><path d="M170 20 H300 V130 H170"/><path d="M20 110 H170 V200 H20 Z"/><path d="M170 130 H300 V200 H170"/>
+                  </g>
+                  <path d="M300 34 V78" stroke="var(--crit)" stroke-width="6" stroke-linecap="round"/>
+                  <circle cx="300" cy="56" r="13" fill="var(--crit)" opacity=".2"/>
+                  <g font-family="Barlow, sans-serif" font-size="13" font-weight="600" fill="var(--muted)">
+                    <text x="34" y="44">North Flat</text><text x="184" y="44">Back Hill</text><text x="34" y="134">Creek</text><text x="184" y="154">Yards</text>
+                  </g>
+                  <text x="292" y="98" text-anchor="end" font-family="Barlow, sans-serif" font-size="12" font-weight="700" fill="var(--crit)">Gap?</text>
+                </svg>
+                <div class="row"><span class="pill crit">1 possible gap</span><span class="sub grow">4.1 km of 4.1 km checked</span></div>
+              </div>
+              <div class="card">
+                <div class="label">Photo · 6:07am</div>
+                <div class="photo"><svg viewBox="0 0 320 170"><rect width="320" height="170" fill="#7c8a4c"/><g opacity=".3" fill="#4a5a2a"><circle cx="60" cy="40" r="26"/><circle cx="250" cy="120" r="34"/></g><path d="M0 70 L120 74" stroke="#d8d2c0" stroke-width="2"/><path d="M0 90 L120 93" stroke="#d8d2c0" stroke-width="2"/><path d="M120 74 Q150 110 165 140" stroke="#d8d2c0" stroke-width="2" fill="none"/><path d="M200 78 L320 82" stroke="#d8d2c0" stroke-width="2"/><path d="M200 97 L320 100" stroke="#d8d2c0" stroke-width="2"/><g fill="#5a4630"><rect x="117" y="60" width="6" height="40"/><rect x="197" y="64" width="6" height="40"/></g><rect x="105" y="50" width="110" height="98" fill="none" stroke="#FF7A66" stroke-width="2"/><rect x="105" y="36" width="96" height="16" fill="#FF7A66"/><text x="110" y="48" font-size="11" font-family="Barlow, sans-serif" font-weight="700" fill="#2a0d08">wire down · 0.81</text></svg></div>
+                <p class="note">Looks like the top and middle wires are down near the east corner post. Back Hill is also 3 head short today.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- LIVE -->
+          <section class="scr fade" id="live">
+            <div class="scroll withtabs">
+              <div class="row"><div class="grow"><div class="label">Dock 1 · Matrice 4D</div><h1 class="h1">Live view</h1></div><span class="pill crit"><span class="dot"></span>Live</span></div>
+              <div class="feed">
+                <canvas id="cv" width="600" height="800"></canvas>
+                <div class="ov t"><span class="chip"><span class="rec"></span>LIVE</span><span class="chip" id="mode">Visual</span></div>
+                <div class="ov b"><span class="chip">Alt 60 m</span><span class="chip">Battery <span id="bat">74</span>%</span><span class="chip">In view <span id="inview">0</span></span></div>
+              </div>
+              <div class="seg" id="seg"><button class="on" data-mode="visual" id="segVisual">Visual</button><button data-mode="thermal" id="segThermal">Thermal</button></div>
+              <div class="card steps">
+                <div class="row"><span class="label grow">Today's mission</span><span class="sub" id="pct">61%</span></div>
+                <div class="s"><span class="tick done">✓</span>Thermal cattle count</div>
+                <div class="s"><span class="tick done">✓</span>Water troughs</div>
+                <div class="s"><span class="tick now"></span>Feed bunk mapping</div>
+                <div class="s"><span class="tick todo"></span>Fence line</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ALERTS -->
+          <section class="scr fade" id="alerts">
+            <div class="scroll withtabs">
+              <h1 class="h1">Alerts</h1>
+              <div class="card todo">
+                <div class="label" style="margin-bottom:4px">Today</div>
+                <button class="item" data-go="fence"><span class="stripe crit"></span><span class="grow"><b>Possible fence gap</b><br><span class="sub">Back Hill east · 6:09am · Texted you</span></span><span class="chev">›</span></button>
+                <button class="item" data-go="water"><span class="stripe crit"></span><span class="grow"><b>Trough 3 at 18%</b><br><span class="sub">Creek · 5:51am · Texted you</span></span><span class="chev">›</span></button>
+                <div class="item"><span class="stripe warn"></span><span class="grow"><b>1 animal to look at</b><br><span class="sub">Creek · 5:48am · In app only</span></span></div>
+                <div class="item"><span class="stripe ok"></span><span class="grow"><b>Daily summary sent</b><br><span class="sub">6:18am · SMS to Patty and Rob</span></span></div>
+              </div>
+              <div class="card todo">
+                <div class="label" style="margin-bottom:4px">Yesterday</div>
+                <div class="item"><span class="stripe ok"></span><span class="grow"><b>All clear</b><br><span class="sub">186 of 186 · troughs OK · fence clear</span></span></div>
+              </div>
+              <div class="card">
+                <div class="label">Who gets texts</div>
+                <div class="row"><span class="grow">Patty · urgent alerts and daily summary</span></div>
+                <div class="row"><span class="grow">Rob · urgent alerts only</span></div>
+                <div class="row sub" style="font-size:13px">Weekly report by email every Monday</div>
+              </div>
+            </div>
+          </section>
+
+          <nav class="tabs" id="tabs" hidden>
+            <button class="tab on" data-tab="today"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>Today</button>
+            <button class="tab" data-tab="live" id="tabLive"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg></span>Live</button>
+            <button class="tab" data-tab="alerts" id="tabAlerts"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span class="badge">2</span></span>Alerts</button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="cbtn exitbare" id="exitBare">Show controls</button>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const screen=$('#screen'), sbar=$('#sbar'), tabs=$('#tabs');
+const tabScreens=['today','live','alerts'];
+let current='lock', stack=[], touring=false, tourToken=0;
+
+/* fit phone */
+function fit(){
+  const f=$('#fit'), h=$('#holder'), p=$('#phone');
+  if(document.body.classList.contains('bare')){p.style.transform='';return}
+  const s=Math.min(1, f.clientHeight/844, f.clientWidth/390);
+  h.style.width=390*s+'px'; h.style.height=844*s+'px'; p.style.transform='scale('+s+')';
+}
+addEventListener('resize',fit); fit();
+
+function setChrome(id){
+  sbar.classList.toggle('light', id==='lock');
+  tabs.hidden=!tabScreens.includes(id) && !['cattle','water','feed','fence'].includes(id);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.tab===id || (t.dataset.tab==='today' && ['cattle','water','feed','fence'].includes(id))));
+  if(id==='live') startFeed(); else stopFeed();
+  if(id==='login') runLogin(); if(id==='code') runCode();
+}
+function go(id, opts={}){
+  if(id===current) return;
+  const from=document.getElementById(current), to=document.getElementById(id);
+  if(opts.tab){
+    from.className='scr fade'; to.className='scr';
+  } else {
+    stack.push(current);
+    to.style.transition='none'; to.className='scr off-r'; void to.offsetWidth; to.style.transition='';
+    to.className='scr'; from.className='scr off-l';
+  }
+  if(opts.root) stack=[];
+  current=id; setChrome(id);
+  const sc=to.querySelector('.scroll'); if(sc && !opts.keepScroll) sc.scrollTop=0;
+}
+function back(){
+  const prev=stack.pop(); if(!prev) return;
+  const from=document.getElementById(current), to=document.getElementById(prev);
+  to.style.transition='none'; to.className='scr off-l'; void to.offsetWidth; to.style.transition='';
+  to.className='scr'; from.className='scr off-r';
+  current=prev; setChrome(prev);
+}
+function tab(id){ stack=[]; go(id,{tab:true}); }
+
+screen.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]'), b=e.target.closest('[data-back]'), t=e.target.closest('[data-tab]'), m=e.target.closest('[data-mode]');
+  if(m){setMode(m.dataset.mode);return}
+  if(b){back();return}
+  if(t){tab(t.dataset.tab);return}
+  if(g){ if(g.id==='verify'){stack=[];go('today',{root:true});stack=[];} else go(g.dataset.go); }
+});
+$('#smslink').addEventListener('keydown',e=>{if(e.key==='Enter')go('login')});
+
+/* login typing */
+let loginDone=false, codeDone=false;
+async function typeInto(el, text, mask, tok){
+  el.classList.add('focus');
+  for(let i=1;i<=text.length;i++){
+    if(tok!==undefined && tok!==tourToken) return;
+    el.textContent = mask? '•'.repeat(i) : text.slice(0,i);
+    el.classList.add('caret'); await wait(55);
+  }
+  el.classList.remove('caret','focus');
+}
+async function runLogin(){
+  if(loginDone) return; loginDone=true;
+  const em=$('#em'), pw=$('#pw'); em.textContent=''; pw.textContent='';
+  await wait(400); await typeInto(em,'patty@pattysfarm.com.au'); await typeInto(pw,'xxxxxxxxxxxx',true);
+}
+async function runCode(){
+  if(codeDone) return; codeDone=true;
+  const cells=[...document.querySelectorAll('#otp div')]; cells.forEach(c=>{c.textContent='';c.classList.remove('f')});
+  await wait(900);
+  const code='482915';
+  for(let i=0;i<6;i++){cells[i].textContent=code[i];cells[i].classList.add('f');await wait(110)}
+}
+
+/* sparks */
+function spark(svg, data, color, min, max){
+  const W=300,H=56,p=6, n=data.length;
+  const x=i=>p+i*(W-2*p)/(n-1), y=v=>H-p-(v-min)/(max-min)*(H-2*p);
+  const d=data.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+  svg.innerHTML=`<line x1="${p}" x2="${W-p}" y1="${H-p}" y2="${H-p}" stroke="var(--line)"/><path d="${d} L${x(n-1)} ${H-p} L${x(0)} ${H-p}Z" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="${x(n-1)}" cy="${y(data[n-1])}" r="4" fill="${color}"/>`;
+}
+spark($('#spCattle'),[186,186,185,186,186,186,184],'var(--warn)',182,187);
+spark($('#spTrough'),[74,72,75,73,71,71,18],'var(--crit)',0,100);
+
+/* live feed */
+const cv=$('#cv'), cx=cv.getContext('2d'); let raf=0, mode='visual', t0=0;
+function rnd(a){let s=a;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+const R=rnd(7);
+function makeBg(thermal){
+  const c=document.createElement('canvas'); c.width=600; c.height=1600; const g=c.getContext('2d');
+  g.fillStyle=thermal?'#1d1436':'#6e8344'; g.fillRect(0,0,600,1600);
+  const r=rnd(thermal?3:3);
+  for(let i=0;i<260;i++){g.fillStyle=thermal?`rgba(${40+r()*30},${20+r()*20},${90+r()*40},.5)`:`rgba(${70+r()*50},${90+r()*40},${40+r()*25},.45)`;g.beginPath();g.arc(r()*600,r()*1600,10+r()*40,0,7);g.fill()}
+  // track
+  g.strokeStyle=thermal?'rgba(120,70,140,.6)':'rgba(170,150,105,.7)'; g.lineWidth=22; g.beginPath(); g.moveTo(80,0); g.bezierCurveTo(200,400,40,800,180,1600); g.stroke();
+  // fence
+  g.strokeStyle=thermal?'rgba(160,120,190,.7)':'rgba(230,225,210,.8)'; g.lineWidth=2; g.beginPath(); g.moveTo(520,0); g.lineTo(540,1600); g.stroke();
+  for(let y=0;y<1600;y+=60){g.fillStyle=thermal?'#7a5a96':'#5b4630'; g.fillRect(518+y/80,y,6,6)}
+  // trees
+  for(let i=0;i<9;i++){const x=r()*480,y=r()*1600,s=26+r()*30;g.fillStyle=thermal?'rgba(70,40,110,.9)':'rgba(46,66,30,.9)';g.beginPath();g.arc(x,y,s,0,7);g.fill()}
+  // trough
+  g.fillStyle=thermal?'#3a2b6a':'#8d9194'; g.beginPath(); g.arc(380,500,34,0,7); g.fill(); g.fillStyle=thermal?'#0e0b25':'#4e7d93'; g.beginPath(); g.arc(380,500,26,0,7); g.fill();
+  return c;
+}
+const bgV=makeBg(false), bgT=makeBg(true);
+const cows=[...Array(46)].map((_,i)=>({x:60+R()*420,y:R()*1600,a:R()*6.28,s:.08+R()*.18,c:R()<.6?'#2b201a':(R()<.5?'#5a3a24':'#8b6a4a')}));
+let count=0;
+function draw(ts){
+  if(!t0) t0=ts; const t=(ts-t0)/1000;
+  const pan=(t*22)%800; const bg=mode==='thermal'?bgT:bgV;
+  cx.drawImage(bg,0,pan,600,800,0,0,600,800);
+  let inview=0;
+  cows.forEach(k=>{
+    k.a+= (Math.sin(t*.7+k.x)*.02); k.x+=Math.cos(k.a)*k.s; k.y+=Math.sin(k.a)*k.s;
+    if(k.x<40||k.x>500){k.a+=Math.PI}
+    const sy=k.y-pan; if(sy<-20||sy>820) return; inview++;
+    cx.save(); cx.translate(k.x,sy); cx.rotate(k.a);
+    if(mode==='thermal'){const gr=cx.createRadialGradient(0,0,2,0,0,18);gr.addColorStop(0,'#fffbe0');gr.addColorStop(.5,'#ffcf3a');gr.addColorStop(1,'rgba(255,90,40,0)');cx.fillStyle=gr;cx.beginPath();cx.ellipse(0,0,20,12,0,0,7);cx.fill()}
+    else{cx.fillStyle=k.c;cx.beginPath();cx.ellipse(0,0,15,8,0,0,7);cx.fill();cx.beginPath();cx.ellipse(15,0,5,4,0,0,7);cx.fill()}
+    cx.restore();
+    cx.strokeStyle=mode==='thermal'?'#7CF2F2':'#7CF2B8'; cx.lineWidth=2; cx.strokeRect(k.x-20,sy-18,40,36);
+  });
+  cx.fillStyle='rgba(255,255,255,.9)'; cx.font='600 15px Barlow, sans-serif';
+  cows.slice(0,6).forEach(k=>{const sy=k.y-pan; if(sy>0&&sy<800){cx.fillStyle=mode==='thermal'?'#7CF2F2':'#7CF2B8';cx.fillRect(k.x-20,sy-34,62,16);cx.fillStyle='#0d2a1e';cx.fillText('cow '+(0.9+(k.s%0.09)).toFixed(2),k.x-17,sy-21)}});
+  $('#inview').textContent=inview;
+  $('#bat').textContent=Math.max(60,74-Math.floor(t/12));
+  $('#pct').textContent=Math.min(99,61+Math.floor(t/3))+'%';
+  raf=requestAnimationFrame(draw);
+}
+function startFeed(){ if(!raf){t0=0;raf=requestAnimationFrame(draw)} }
+function stopFeed(){ cancelAnimationFrame(raf); raf=0 }
+function setMode(m){ mode=m; document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m)); $('#mode').textContent=m==='thermal'?'Thermal':'Visual'; }
+
+/* reset */
+function reset(){
+  tourToken++; touring=false; $('#tourBtn').textContent='▶ Play auto tour';
+  stopFeed(); setMode('visual'); loginDone=false; codeDone=false; $('#em').textContent=''; $('#pw').textContent='';
+  document.querySelectorAll('#otp div').forEach(c=>{c.textContent='';c.classList.remove('f')});
+  document.querySelectorAll('.scr').forEach(s=>{s.style.transition='none';s.className='scr '+(tabScreens.includes(s.id)&&s.id!=='today'?'fade':'off-r')});
+  const l=$('#lock'); l.className='scr'; void l.offsetWidth; document.querySelectorAll('.scr').forEach(s=>s.style.transition='');
+  current='lock'; stack=[]; setChrome('lock');
+}
+$('#resetBtn').onclick=reset;
+
+/* bare mode */
+function setBare(on){document.body.classList.toggle('bare',on); fit();}
+$('#bareBtn').onclick=()=>setBare(true);
+$('#exitBare').onclick=()=>setBare(false);
+addEventListener('keydown',e=>{if(e.key==='Escape')setBare(false)});
+
+/* auto tour */
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function ripple(el){
+  const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect();
+  const sc=sr.width/screen.offsetWidth||1;
+  const d=document.createElement('div'); d.className='taprip';
+  d.style.left=((r.left+r.width/2-sr.left)/sc)+'px'; d.style.top=((r.top+r.height/2-sr.top)/sc)+'px';
+  screen.appendChild(d); setTimeout(()=>d.remove(),600);
+}
+async function tap(sel, tok){ if(tok!==tourToken) throw 0; const el=typeof sel==='string'?$(sel):sel; ripple(el); await wait(260); if(tok!==tourToken) throw 0; el.click(); }
+async function pause(ms,tok){ await wait(ms); if(tok!==tourToken) throw 0; }
+async function scrollTo(el, y, tok){ el.scrollTop=y; await pause(900,tok); }
+async function tour(){
+  reset(); touring=true; const tok=++tourToken; $('#tourBtn').textContent='■ Stop tour';
+  try{
+    await pause(2200,tok);
+    await tap('#notif',tok); await pause(3200,tok);
+    await tap('#smslink',tok); await pause(3300,tok);
+    await tap('#signin',tok); await pause(2400,tok);
+    await tap('#verify',tok); await pause(2600,tok);
+    const ts=$('#todayScroll');
+    await scrollTo(ts,260,tok); await pause(1200,tok); await scrollTo(ts,620,tok); await pause(1200,tok); await scrollTo(ts,0,tok);
+    await tap('#tileCattle',tok); await pause(3200,tok); await tap('#cattle [data-back]',tok); await pause(900,tok);
+    await tap('#tileWater',tok); await pause(3400,tok); await tap('#water [data-back]',tok); await pause(900,tok);
+    await tap('#tileFeed',tok); await pause(2600,tok); await tap('#feed [data-back]',tok); await pause(900,tok);
+    await tap('#tileFence',tok); await pause(2000,tok); $('#fence .scroll').scrollTop=280; await pause(2400,tok); await tap('#fence [data-back]',tok); await pause(900,tok);
+    await tap('#tabLive',tok); await pause(4200,tok); await tap('#segThermal',tok); await pause(4200,tok); await tap('#segVisual',tok); await pause(1500,tok);
+    await tap('#tabAlerts',tok); await pause(3500,tok);
+    await tap('.tab[data-tab="today"]',tok);
+  }catch(e){}
+  if(tok===tourToken){touring=false;$('#tourBtn').textContent='▶ Play auto tour'}
+}
+$('#tourBtn').onclick=()=>{ if(touring){tourToken++;touring=false;$('#tourBtn').textContent='▶ Play auto tour'} else tour(); };
+setChrome('lock');
+})();
+</script>
+
+</body></html>
