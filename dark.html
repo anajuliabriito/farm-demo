@@ -1,0 +1,771 @@
+<title>Muster Farm App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600;700&display=swap">
+<style>
+/* Layout: a drone-ops console on a phone. Dark graphite chrome, satellite maps edge to edge, telemetry set in a narrow face. Deliberately single (dark) theme, like flight apps used outdoors. */
+:root{
+  --bg:#14171B; --panel:#1D2127; --panel2:#272C33; --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.16);
+  --ink:#F1F3F5; --sec:#9BA4AE; --ter:#5E6772;
+  --accent:#3C8DFF; --accent-dim:rgba(60,141,255,.16);
+  --ok:#35C47C; --warn:#F2A33A; --crit:#FF5B4F; --crit-dim:rgba(255,91,79,.16); --warn-dim:rgba(242,163,58,.16); --ok-dim:rgba(53,196,124,.14);
+  --stage:#E4E7EA; --stage-ink:#2A3038;
+  --font:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  --num:"Archivo Narrow","Arial Narrow",-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--stage:#E4E7EA;--stage-ink:#2A3038}}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--stage:#0E1013;--stage-ink:#C9D0D7}}
+:root[data-theme="dark"]{--stage:#0E1013;--stage-ink:#C9D0D7}
+:root[data-theme="light"]{--stage:#E4E7EA;--stage-ink:#2A3038}
+html,body{height:100%}
+body{background:var(--stage);color:var(--ink);font-family:var(--font);font-size:15px;margin:0;overflow:hidden;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0;text-align:inherit}
+button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* stage */
+.stage{height:100%;display:flex;flex-direction:column;align-items:center;padding-inline:16px;padding-block:12px;gap:12px}
+.controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:center;font-size:14px;color:var(--stage-ink)}
+.controls button.link{color:var(--accent);font-weight:600}
+.viewas{display:flex;align-items:center;gap:8px}
+.viewas .tog{display:flex;border:1px solid var(--accent);border-radius:7px;overflow:hidden}
+.viewas .tog button{padding:5px 11px;font-size:13px;font-weight:600;color:var(--accent)}
+.viewas .tog button.on{background:var(--accent);color:#fff}
+.fit{flex:1;min-height:0;width:100%;display:flex;justify-content:center}
+.holder{position:relative}
+.phone{position:absolute;top:0;left:0;width:390px;height:844px;border-radius:56px;background:#050607;padding:11px;transform-origin:top left;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 26px 50px -24px rgba(0,0,0,.55)}
+.screen{position:relative;width:100%;height:100%;border-radius:45px;overflow:hidden;background:var(--bg)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:122px;height:35px;background:#000;border-radius:20px;z-index:50}
+body.bare .controls{display:none}
+body.bare .stage{padding:0}
+body.bare .holder{width:100%!important;height:100%!important}
+body.bare .phone{position:static;transform:none!important;width:100%;height:100%;padding:0;border-radius:0;box-shadow:none;background:none}
+body.bare .screen{border-radius:0}
+body.bare .island{display:none}
+.exitbare{display:none;position:fixed;right:10px;bottom:10px;z-index:99;opacity:0;font-size:12px;color:var(--accent)}
+body.bare .exitbare{display:block}
+.exitbare:focus-visible,.exitbare:hover{opacity:1}
+
+/* status bar */
+.sbar{position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:6px 34px 0 42px;font-weight:600;font-size:16px;z-index:40;pointer-events:none;color:#fff}
+.sbar.dark{color:#111}
+.sbar .icons{display:flex;gap:6px;align-items:center}
+
+/* screens */
+.scr{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .36s cubic-bezier(.2,.8,.2,1),opacity .22s}
+.scr.off-r,.scr.off-l,.scr.fade{pointer-events:none}
+.scr.off-r{transform:translateX(100%)}
+.scr.off-l{transform:translateX(-30%);opacity:0}
+.scr.fade{opacity:0}
+@media (prefers-reduced-motion: reduce){.scr{transition:none}}
+.scroll{flex:1;overflow-y:auto;padding:54px 0 28px;scroll-behavior:smooth}
+.scroll.withtabs{padding-bottom:98px}
+.scroll::-webkit-scrollbar{display:none}
+
+.nav{height:42px;display:flex;align-items:center;padding:0 8px}
+.back{display:flex;align-items:center;gap:4px;color:var(--accent);font-size:16px;padding:6px 8px;font-weight:500}
+.head{padding:4px 16px 14px;display:flex;flex-direction:column;gap:6px}
+.h1{font-size:28px;font-weight:700;letter-spacing:-.4px;line-height:1.1;margin:0;text-wrap:balance}
+.meta{color:var(--sec);font-size:14px;margin:0;line-height:1.35}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
+.st{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:4px 9px;border-radius:6px;white-space:nowrap}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st.ok{color:var(--ok);background:var(--ok-dim)}
+.st.crit{color:var(--crit);background:var(--crit-dim)}
+.st.warn{color:var(--warn);background:var(--warn-dim)}
+.st.fly{color:var(--accent);background:var(--accent-dim)}
+.st.fly::before{animation:blink 1.2s steps(1) infinite}
+@keyframes blink{50%{opacity:.2}}
+
+.sect{margin:0 16px 22px}
+.stitle{font-size:13.5px;font-weight:600;color:var(--sec);margin:0 2px 8px;display:flex;justify-content:space-between}
+.panel{background:var(--panel);border-radius:10px;overflow:hidden}
+.rows .r{display:flex;align-items:center;gap:12px;padding:12px 14px;width:100%;position:relative;min-height:48px}
+.rows .r+.r{border-top:1px solid var(--line)}
+.r .ic{width:22px;flex:none;display:grid;place-items:center}
+.r .main{flex:1;min-width:0;line-height:1.3}
+.r .main small{display:block;color:var(--sec);font-size:13px;margin-top:2px}
+.r .val{font-family:var(--num);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.r .chev{color:var(--ter);flex:none}
+button.r:active{background:var(--panel2)}
+.c-crit{color:var(--crit)}.c-warn{color:var(--warn)}.c-ok{color:var(--ok)}.c-acc{color:var(--accent)}.c-sec{color:var(--sec)}
+.note{font-size:13px;color:var(--sec);margin:8px 2px 0;line-height:1.4}
+
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{background:var(--panel);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column;gap:3px;text-align:left;min-height:98px}
+.tile:active{background:var(--panel2)}
+.tile .lbl{font-size:13px;color:var(--sec);display:flex;align-items:center;gap:6px}
+.tile .big{font-family:var(--num);font-weight:700;font-size:32px;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.tile .big small{font-size:17px;color:var(--sec);font-weight:600}
+.tile .sub{font-size:12.5px;font-weight:600}
+
+.banner{margin:0 16px 16px;padding:11px 13px;border-radius:10px;display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.35}
+.banner.fly{background:var(--accent-dim);color:#cfe1ff}
+.banner.warn{background:var(--warn-dim);color:#ffe2b8}
+.banner b{color:#fff}
+.banner .lnk{color:var(--accent);font-weight:600;display:inline-block;margin-top:4px}
+
+/* map */
+.mapwrap{position:relative;margin:0 0 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mapwrap svg{display:block;width:100%;height:auto}
+.mapchip{position:absolute;background:rgba(20,23,27,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px;display:flex;gap:6px;align-items:center;font-variant-numeric:tabular-nums}
+.mapchip.tl{left:10px;top:10px}.mapchip.br{right:10px;bottom:10px}
+.pulse{animation:pulse 1.8s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none;opacity:.5}}
+
+/* tabs under map */
+.utabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);margin-bottom:16px;position:sticky;top:0;background:var(--bg);z-index:5}
+.utabs button{flex:1;padding:13px 2px 11px;font-size:14px;font-weight:600;color:var(--sec);text-align:center;border-bottom:2px solid transparent;margin-bottom:-1px}
+.utabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* farms list */
+.fcard{display:flex;gap:12px;padding:10px;background:var(--panel);border-radius:10px;width:100%;text-align:left;align-items:stretch}
+.fcard+.fcard{margin-top:8px}
+.fcard:active{background:var(--panel2)}
+.fcard .thumb{width:112px;flex:none;border-radius:7px;overflow:hidden;position:relative;aspect-ratio:360/240}
+.fcard .thumb svg{display:block;width:100%;height:100%}
+.fcard .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;justify-content:center}
+.fcard .nm{font-weight:700;font-size:16px}
+.fcard .ln{font-size:13px;color:var(--sec);display:flex;justify-content:space-between;gap:8px}
+.fcard .ln b{font-family:var(--num);font-weight:600;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px 20px}
+.summary div{background:var(--panel);border-radius:10px;padding:10px 12px}
+.summary b{display:block;font-family:var(--num);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.summary span{font-size:12.5px;color:var(--sec)}
+
+.meter{height:5px;border-radius:3px;background:var(--panel2);overflow:hidden;margin-top:7px}
+.meter i{display:block;height:100%;background:var(--accent)}
+.meter i.crit{background:var(--crit)}.meter i.warn{background:var(--warn)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:15px}
+td,th{padding:11px 14px;text-align:right;border-top:1px solid var(--line)}
+td{font-family:var(--num);font-weight:600;font-size:16px}
+td:first-child{font-family:var(--font);font-weight:500;font-size:15px}
+th{font-size:12.5px;color:var(--sec);font-weight:500;border-top:0;padding-bottom:4px}
+td:first-child,th:first-child{text-align:left}
+tr.total td{color:var(--ink)}
+.spark{width:100%;height:58px;display:block}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--ter);margin-top:4px}
+.bigline{display:flex;align-items:baseline;gap:8px}
+.bigline b{font-family:var(--num);font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.bigline span{color:var(--sec);font-size:15px}
+.photo{display:block;width:100%;height:auto}
+
+/* bottom tabs */
+.tabs{position:absolute;left:0;right:0;bottom:0;height:82px;background:rgba(24,27,32,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line);display:flex;padding:8px 22px 28px;z-index:30}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ter);text-align:center}
+.tab.on{color:var(--accent)}
+.tab .ic{position:relative;display:flex}
+.tab .badge{position:absolute;top:-4px;right:-10px;background:var(--crit);color:#fff;font-size:11px;font-weight:700;min-width:17px;height:17px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+.tab .live-dot{position:absolute;top:-1px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px rgba(24,27,32,1)}
+
+/* lock */
+#lock{background:#203043 linear-gradient(180deg,#152233 0%,#3f4a63 40%,#9c6f5e 74%,#d39a63 100%);color:#fff}
+#lock .wrap{flex:1;display:flex;flex-direction:column;align-items:center;padding:78px 10px 0;position:relative;z-index:2}
+#lock .date{font-weight:600;font-size:19px;opacity:.88}
+#lock .time{font-weight:600;font-size:92px;line-height:1;letter-spacing:-2px;margin-top:2px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#lock .hills{position:absolute;left:0;right:0;bottom:0;width:100%;height:38%;z-index:1}
+.notif{margin-top:auto;margin-bottom:132px;width:100%;background:rgba(240,240,240,.74);color:#151a17;border-radius:22px;padding:13px 14px;display:flex;gap:11px;align-items:flex-start;backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.notif .hd{display:flex;justify-content:space-between;font-size:15px}
+.notif .hd span{color:#5c625f;font-size:13.5px}
+.notif p{margin:1px 0 0;font-size:15px;line-height:1.3}
+.msgicon{width:38px;height:38px;border-radius:9px;flex:none;background:linear-gradient(#5ff07a,#20c040);display:grid;place-items:center}
+
+/* sms (system app, light) */
+#sms{background:#fff;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.smshead{padding:54px 16px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;border-bottom:1px solid #e3e3e3;background:#f7f7f7}
+.smshead .av{width:54px;height:54px;border-radius:50%;background:linear-gradient(#a7aeb0,#868d90);display:grid;place-items:center;color:#fff;font-size:22px;font-weight:600}
+.smshead .who{font-size:12.5px}
+.thread{flex:1;overflow-y:auto;padding:12px 14px 16px;display:flex;flex-direction:column;gap:3px}
+.stamp{text-align:center;font-size:11.5px;color:#8a8a8e;margin:12px 0 6px}
+.bub{max-width:80%;background:#e9e9eb;border-radius:18px;padding:8px 13px;font-size:16px;line-height:1.32;align-self:flex-start;white-space:pre-line}
+.bub .lnk{color:#1f78f0;text-decoration:underline;cursor:pointer}
+.smsbar{display:flex;padding:8px 12px 32px}
+.smsbar div{flex:1;border:1px solid #c7c7cc;border-radius:18px;padding:7px 14px;color:#a0a0a5;font-size:16px}
+
+/* auth */
+.auth{flex:1;display:flex;flex-direction:column;padding:104px 0 40px}
+.logo{display:flex;align-items:center;gap:10px;margin:0 20px 26px}
+.logo svg{width:44px;height:44px}
+.logo b{font-size:22px;font-weight:700;letter-spacing:.2px}
+.fields{margin:0 16px 10px}
+.field{background:var(--panel);border-radius:10px;padding:10px 14px;margin-bottom:8px;min-height:58px}
+.field label{display:block;font-size:12.5px;color:var(--sec);margin-bottom:3px}
+.field .v{font-size:16px;min-height:21px;white-space:nowrap;overflow:hidden}
+.field.focus{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.caret::after{content:"";display:inline-block;width:2px;height:18px;background:var(--accent);vertical-align:-3px;margin-left:1px;animation:blink 1s steps(1) infinite}
+.primary{display:block;margin:10px 16px 0;padding:15px;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;text-align:center;width:calc(100% - 32px)}
+.fine{font-size:12.5px;color:var(--ter);text-align:center;margin:auto 24px 0;line-height:1.4}
+.otp{display:flex;gap:8px;margin:6px 16px 8px}
+.otp div{flex:1;height:60px;border-radius:10px;background:var(--panel);display:grid;place-items:center;font-family:var(--num);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.otp div.f{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.otp .gap{flex:.15;background:none}
+
+/* live */
+.feedwrap{position:relative;background:#000;aspect-ratio:3/4;width:100%}
+.feedwrap canvas{width:100%;height:100%;display:block}
+.hud{position:absolute;inset:0;pointer-events:none;color:#fff;font-family:var(--num);font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
+.hud .tbar{position:absolute;top:0;left:0;right:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(rgba(0,0,0,.55),transparent);font-size:13px}
+.hud .rec{display:flex;align-items:center;gap:6px}
+.hud .rec i{width:8px;height:8px;border-radius:50%;background:#ff3b30;animation:blink 1s steps(1) infinite}
+.hud .rec.replay i{background:var(--accent);animation:none}
+.hud .sig{display:flex;gap:10px}
+.hud .cross{position:absolute;left:50%;top:46%;width:46px;height:46px;margin:-23px 0 0 -23px}
+.hud .bbar{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.7));display:flex;justify-content:space-between;gap:6px}
+.hud .bbar div{display:flex;flex-direction:column;align-items:flex-start;font-size:17px;line-height:1.1}
+.hud .bbar span{font-size:10.5px;font-weight:600;letter-spacing:.06em;opacity:.75;font-family:var(--font)}
+.hud .mini{position:absolute;right:10px;top:42px;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.3);background:#1b241d}
+.hud .count{position:absolute;left:12px;top:44px;font-size:13px;background:rgba(0,0,0,.5);padding:4px 8px;border-radius:5px}
+.camtabs{display:flex;gap:6px;padding:12px 16px 16px}
+.camtabs button{padding:7px 14px;border-radius:7px;background:var(--panel);font-size:13.5px;font-weight:600;color:var(--sec)}
+.camtabs button.on{background:var(--accent);color:#fff}
+.camtabs .sp{flex:1}
+.picker{display:flex;gap:6px;padding:4px 16px 12px;overflow-x:auto}
+.picker::-webkit-scrollbar{display:none}
+.picker button{flex:none;padding:7px 11px;border-radius:7px;background:var(--panel);font-size:13px;font-weight:600;color:var(--sec);display:flex;gap:6px;align-items:center}
+.picker button.on{box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--ink)}
+.picker .dot{width:7px;height:7px;border-radius:50%;background:var(--ter)}
+.picker .dot.fly{background:var(--accent)}
+.step{width:20px;height:20px;flex:none;display:grid;place-items:center}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--panel2);border-top-color:var(--accent);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ring{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--ter)}
+
+.filters{display:flex;gap:6px;padding:0 16px 16px;overflow-x:auto}
+.filters::-webkit-scrollbar{display:none}
+.filters button{flex:none;padding:7px 12px;border-radius:7px;background:var(--panel);font-size:13px;font-weight:600;color:var(--sec)}
+.filters button.on{background:var(--ink);color:var(--bg)}
+
+.taprip{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(60,141,255,.35);pointer-events:none;z-index:60;animation:rip .5s ease-out forwards}
+@keyframes rip{from{transform:scale(.35);opacity:1}to{transform:scale(1.45);opacity:0}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#3C8DFF"/><g stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M18 24h28"/><circle cx="16" cy="24" r="6"/><circle cx="48" cy="24" r="6"/></g><rect x="26" y="27" width="12" height="7" rx="2.5" fill="#fff"/><path d="M12 48c7-5 13-5 20 0s13 5 20 0" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".7"/></symbol>
+    <symbol id="chev" viewBox="0 0 8 14"><path d="M1.5 1.5 7 7l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="back" viewBox="0 0 11 19"><path d="M9 2 2 9.5 9 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="warn" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Z" fill="currentColor"/><path d="M12 10v4.5" stroke="#14171B" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.2" fill="#14171B"/></symbol>
+    <symbol id="ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7.5 12.3 3 3 6-6.3" fill="none" stroke="#14171B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="wind" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="flag" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="dock" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 9V6h12v3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="t-farms" viewBox="0 0 28 28"><path d="M4 7l6.5-3 7 3 6.5-3v17l-6.5 3-7-3L4 24Z M10.5 4v17 M17.5 7v17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></symbol>
+    <symbol id="t-live" viewBox="0 0 28 28"><rect x="3" y="7" width="16" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2.1"/><path d="m19 12 6-3.5v11L19 16" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/></symbol>
+    <symbol id="t-alerts" viewBox="0 0 28 28"><path d="M7 19v-6a7 7 0 0 1 14 0v6l2 2H5l2-2Z" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M11.5 24h5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+  <div class="controls">
+    <div class="viewas"><span>Signed in as</span><div class="tog" id="viewTog"><button class="on" data-view="ops">Operator</button><button data-view="patty">Patty</button></div></div>
+    <button class="link" id="tourBtn">Play walkthrough</button>
+    <button class="link" id="resetBtn">Start again</button>
+    <button class="link" id="bareBtn">Hide phone frame</button>
+  </div>
+  <div class="fit" id="fit">
+    <div class="holder" id="holder">
+      <div class="phone" id="phone">
+        <div class="screen" id="screen">
+          <div class="island"></div>
+          <div class="sbar" id="sbar"><span>6:19</span><span class="icons">
+            <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x=".5" y=".5" width="23" height="12" rx="3.8" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor"/><path d="M25 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2Z" fill="currentColor" opacity=".4"/></svg>
+          </span></div>
+
+          <!-- LOCK -->
+          <section class="scr" id="lock">
+            <svg class="hills" viewBox="0 0 390 320" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><path d="M0 120 C70 90 140 118 210 96 C280 74 340 100 390 86 V320 H0Z" fill="#363f35"/><path d="M0 180 C80 156 170 178 250 160 C320 146 360 158 390 152 V320 H0Z" fill="#232a21"/><g fill="#181d16"><ellipse cx="236" cy="176" rx="9" ry="3.6"/><ellipse cx="254" cy="179" rx="8" ry="3.2"/><ellipse cx="300" cy="170" rx="7" ry="3"/></g><g stroke="#181d16" stroke-width="2"><path d="M60 198h120M70 198v-10M100 198v-10M130 198v-10M160 198v-10"/></g></svg>
+            <div class="wrap">
+              <div class="date">Thursday 8 October</div>
+              <div class="time">6:19</div>
+              <button class="notif" id="notif" data-go="sms">
+                <span class="msgicon"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 4C6.5 4 3 7.4 3 11.3c0 2.2 1.1 4.1 3 5.4L5.3 20l3.6-2.1c1 .3 2 .4 3.1.4 5.5 0 9-3.4 9-7S17.5 4 12 4Z" fill="#fff"/></svg></span>
+                <div style="flex:1;min-width:0">
+                  <div class="hd"><b>Muster</b><span>now</span></div>
+                  <p id="notifText"></p>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <!-- SMS -->
+          <section class="scr off-r" id="sms">
+            <div class="smshead"><div class="av">M</div><div class="who">Muster ›</div></div>
+            <div class="thread" id="thread"></div>
+            <div class="smsbar"><div>Text Message</div></div>
+          </section>
+
+          <!-- LOGIN -->
+          <section class="scr off-r" id="login">
+            <div class="auth">
+              <div class="logo"><svg><use href="#logo"/></svg><b>Muster</b></div>
+              <div class="head" style="padding-top:0"><h1 class="h1">Sign in</h1><p class="meta">Daily drone results for your farms.</p></div>
+              <div class="fields">
+                <div class="field" id="emF"><label>Email</label><div class="v" id="em"></div></div>
+                <div class="field" id="pwF"><label>Password</label><div class="v" id="pw"></div></div>
+              </div>
+              <button class="primary" id="signin" data-go="code">Continue</button>
+              <p class="fine">Flights and detection run on DJI FlightHub 2.<br>New devices need a texted code to sign in.</p>
+            </div>
+          </section>
+
+          <!-- CODE -->
+          <section class="scr off-r" id="code">
+            <div class="auth" style="padding-top:54px">
+              <div class="nav"><button class="back" data-back><svg width="11" height="19"><use href="#back"/></svg>Back</button></div>
+              <div class="head"><h1 class="h1">Enter code</h1><p class="meta" id="codeMeta">We texted a code to the number ending in 418.</p></div>
+              <div class="otp" id="otp"><div></div><div></div><div></div><span class="gap"></span><div></div><div></div><div></div></div>
+              <button class="primary" id="verify" data-go="farms">Verify</button>
+            </div>
+          </section>
+
+          <!-- FARMS -->
+          <section class="scr off-r" id="farms">
+            <div class="scroll withtabs" id="farmsScroll"></div>
+          </section>
+
+          <!-- FARM -->
+          <section class="scr off-r" id="farm">
+            <div class="scroll withtabs" id="farmScroll"></div>
+          </section>
+
+          <!-- LIVE -->
+          <section class="scr fade" id="live">
+            <div class="scroll withtabs" id="liveScroll" style="padding-top:50px">
+              <div class="head" style="padding-bottom:10px"><h1 class="h1">Live</h1></div>
+              <div class="picker" id="picker"></div>
+              <div class="feedwrap">
+                <canvas id="cv" width="600" height="800"></canvas>
+                <div class="hud">
+                  <div class="tbar"><span class="rec" id="recLbl"><i></i><span id="recTxt">LIVE</span>&nbsp;<span id="recTime">00:17:12</span></span><span class="sig"><span id="camLbl">WIDE</span><span>4G</span><span>RTK FIX</span></span></div>
+                  <div class="count" id="countLbl">Cattle in view 0</div>
+                  <svg class="mini" viewBox="0 0 96 96" id="mini"></svg>
+                  <svg class="cross" viewBox="0 0 46 46"><g stroke="#fff" stroke-width="1.5" opacity=".85"><path d="M0 23h16M30 23h16M23 0v16M23 30v16"/></g><circle cx="23" cy="23" r="2" fill="#fff"/></svg>
+                  <div class="bbar">
+                    <div><span>ALT</span><b id="tAlt">60.0</b></div>
+                    <div><span>H.S</span><b id="tHs">8.2</b></div>
+                    <div><span>V.S</span><b id="tVs">0.0</b></div>
+                    <div><span>DIST</span><b id="tD">640</b></div>
+                    <div><span>BATT</span><b id="tB">68%</b></div>
+                  </div>
+                </div>
+              </div>
+              <div class="camtabs" id="camtabs"><button class="on" data-cam="wide" id="camWide">Wide</button><button data-cam="ir" id="camIr">Thermal</button><span class="sp"></span></div>
+              <div class="sect">
+                <div class="stitle"><span>Today's route</span><span id="pct">64%</span></div>
+                <div class="panel rows" id="routeRows"></div>
+                <p class="note">This is a view only. Flying is handled by the dock and FlightHub 2, so nothing here can move the drone.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- ALERTS -->
+          <section class="scr fade" id="alerts">
+            <div class="scroll withtabs" id="alertsScroll"></div>
+          </section>
+
+          <nav class="tabs" id="tabs" hidden>
+            <button class="tab on" data-tab="farms"><span class="ic"><svg width="28" height="28"><use href="#t-farms"/></svg></span>Farms</button>
+            <button class="tab" data-tab="live" id="tabLive"><span class="ic"><svg width="28" height="28"><use href="#t-live"/></svg><span class="live-dot" id="liveDot"></span></span>Live</button>
+            <button class="tab" data-tab="alerts" id="tabAlerts"><span class="ic"><svg width="28" height="28"><use href="#t-alerts"/></svg><span class="badge" id="badge">3</span></span>Alerts</button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="exitbare" id="exitBare">Show controls</button>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const chev='<svg class="chev" width="8" height="14"><use href="#chev"/></svg>';
+const ico=(id,cls)=>`<span class="ic ${cls||''}"><svg width="20" height="20"><use href="#${id}"/></svg></span>`;
+
+/* ---------- data ---------- */
+const FARMS=[
+ {id:'patty',name:"Patty's farm",region:'Gloucester NSW',status:'crit',statusText:'2 alerts',run:'Run finished 6:18am, 36 min',
+  head:186,counted:184,hist:[186,186,185,186,186,186,184],heat:31,welfare:'1 animal lying away from the herd at dawn, Creek paddock',
+  paddocks:[
+   {n:'North Flat',pts:[[14,14],[182,14],[176,118],[14,122]],c:72,y:72},
+   {n:'Back Hill',pts:[[182,14],[346,14],[346,134],[176,118]],c:41,y:44,issue:true},
+   {n:'Creek',pts:[[14,122],[176,118],[170,226],[14,226]],c:58,y:57},
+   {n:'Yards',pts:[[176,118],[346,134],[346,226],[170,226]],c:13,y:13}],
+  creek:'M20 190 C70 168 110 204 168 176',
+  troughs:[{n:'Trough 1',p:'North Flat',v:92,x:140,y:92},{n:'Trough 2',p:'Yards',v:64,x:300,y:186},{n:'Trough 3',p:'Creek',v:18,prev:71,x:48,y:204,photo:true},{n:'Trough 4',p:'Back Hill',v:81,x:312,y:104}],
+  bunks:[{n:'Bunk B',p:'Creek',m3:2.9,pct:29,days:2},{n:'Bunk A',p:'North Flat',m3:6.8,pct:68,days:3}],
+  fenceKm:4.1,fenceIssue:{p:'Back Hill',t:'Fence wire may be down',s:'East side near the corner post, photo at 6:07am',seg:[[346,34],[346,82]]},
+  dock:{x:214,y:196,state:'Docked, charging 96%',next:'Tomorrow 5:40am',wind:'12 km/h'},
+  alerts:[{lvl:'crit',t:'Trough 3 is at 18%',s:'Creek paddock, down from 71% yesterday',seg:'water',time:'5:51am'},
+          {lvl:'crit',t:'Fence wire may be down',s:'Back Hill, east side',seg:'fence',time:'6:09am'}],
+  changes:[['Cattle on Back Hill','−3','crit'],['Cattle on Creek','+1','ok'],['Trough 3','71% to 18%','crit'],['Feed used','2.4 m³','']]},
+ {id:'ridge',name:'Ridgeview',region:'Walcha NSW',status:'ok',statusText:'All clear',run:'Run finished 6:05am, 41 min',
+  head:312,counted:312,hist:[311,312,312,312,310,312,312],heat:27,welfare:null,
+  paddocks:[
+   {n:'Top Ridge',pts:[[14,14],[150,14],[140,104],[14,96]],c:88,y:88},
+   {n:'Gully',pts:[[150,14],[346,14],[346,92],[140,104]],c:64,y:63},
+   {n:'River Flat',pts:[[14,96],[140,104],[134,226],[14,226]],c:97,y:98},
+   {n:'Home',pts:[[140,104],[346,92],[346,160],[138,168]],c:41,y:41},
+   {n:'Lucerne',pts:[[138,168],[346,160],[346,226],[134,226]],c:22,y:22}],
+  creek:'M24 120 C50 160 40 200 70 226',
+  troughs:[{n:'Trough 1',p:'Top Ridge',v:88,x:30,y:80},{n:'Trough 2',p:'Gully',v:76,x:320,y:40},{n:'Trough 3',p:'River Flat',v:94,x:40,y:210},{n:'Trough 4',p:'Home',v:69,x:190,y:150},{n:'Trough 5',p:'Lucerne',v:83,x:320,y:215}],
+  bunks:[{n:'Bunk A',p:'Home',m3:9.4,pct:78,days:4},{n:'Bunk B',p:'River Flat',m3:7.1,pct:61,days:3}],
+  fenceKm:6.3,fenceIssue:null,
+  dock:{x:300,y:128,state:'Docked, charged',next:'Tomorrow 5:35am',wind:'9 km/h'},
+  alerts:[],changes:[['Cattle on Gully','+1','ok'],['Cattle on River Flat','−1',''],['Feed used','3.1 m³','']]},
+ {id:'murray',name:'Murray Creek',region:'Scone NSW',status:'fly',statusText:'Flying now',run:'Run started 6:02am',
+  head:148,counted:148,hist:[147,148,148,148,148,148,148],heat:29,welfare:null,
+  paddocks:[
+   {n:'East',pts:[[180,14],[346,14],[346,226],[190,226]],c:60,y:60},
+   {n:'West',pts:[[14,14],[180,14],[176,130],[14,136]],c:52,y:52},
+   {n:'Dam',pts:[[14,136],[176,130],[190,226],[14,226]],c:36,y:36}],
+  dam:[96,184,26],
+  troughs:[{n:'Trough 1',p:'East',v:71,x:320,y:60},{n:'Trough 2',p:'West',v:46,prev:58,x:40,y:40},{n:'Trough 3',p:'Dam',v:85,x:160,y:210}],
+  bunks:[{n:'Bunk A',p:'East',m3:5.2,pct:52,days:3}],
+  fenceKm:3.2,fenceIssue:null,
+  dock:{x:250,y:200,state:'Flying, 64% of route',next:'In progress',wind:'14 km/h'},
+  alerts:[],changes:[['Trough 2','58% to 46%','warn'],['Feed used','1.7 m³','']]},
+ {id:'bell',name:'Bellwood Station',region:'Tamworth NSW',status:'warn',statusText:'Weather hold',run:'Postponed for wind',
+  head:95,counted:95,hist:[95,95,94,95,95,95,95],heat:30,welfare:null,
+  paddocks:[
+   {n:'Front',pts:[[14,14],[200,14],[196,110],[14,120]],c:38,y:38},
+   {n:'Back',pts:[[200,14],[346,14],[346,226],[204,226]],c:31,y:31},
+   {n:'Lane',pts:[[14,120],[196,110],[204,226],[14,226]],c:26,y:26}],
+  troughs:[{n:'Trough 1',p:'Front',v:84,x:170,y:40},{n:'Trough 2',p:'Back',v:77,x:320,y:200},{n:'Trough 3',p:'Lane',v:90,x:40,y:210}],
+  bunks:[{n:'Bunk A',p:'Front',m3:4.4,pct:55,days:3}],
+  fenceKm:3.6,fenceIssue:null,
+  dock:{x:160,y:190,state:'Docked, waiting for wind to drop',next:'Retry 9:00am',wind:'41 km/h gusts'},
+  alerts:[{lvl:'warn',t:'Run postponed for wind',s:'Gusts 41 km/h. The dock will retry at 9:00am.',seg:'overview',time:'5:40am'}],
+  changes:[['Cattle','No change',''],['Feed used','1.2 m³','']]}
+];
+const VIEWS={ops:{farms:['patty','ridge','murray','bell'],email:'ops@muster.app',phone:'207'},patty:{farms:['patty'],email:'patty@pattysfarm.com.au',phone:'418'}};
+let view='ops';
+const visible=()=>FARMS.filter(f=>VIEWS[view].farms.includes(f.id));
+const byId=id=>FARMS.find(f=>f.id===id);
+
+/* ---------- map ---------- */
+function rnd(a){let s=a;return()=>{s=(s*9301+49297)%233280;return s/233280}}
+function centroid(p){let x=0,y=0;p.forEach(q=>{x+=q[0];y+=q[1]});return[x/p.length,y/p.length]}
+function mapSVG(f,mode){
+  const r=rnd(f.id.length*17+f.head);
+  const full=mode==='full';
+  let s=`<svg viewBox="0 0 360 240" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of ${f.name}"><rect width="360" height="240" fill="#2c3626"/>`;
+  for(let i=0;i<70;i++){const g=r();s+=`<circle cx="${(r()*360).toFixed(0)}" cy="${(r()*240).toFixed(0)}" r="${(6+r()*26).toFixed(0)}" fill="${g<.5?'#35412d':g<.8?'#262f21':'#433f2c'}" opacity=".7"/>`}
+  for(let i=0;i<26;i++){s+=`<circle cx="${(r()*360).toFixed(0)}" cy="${(r()*240).toFixed(0)}" r="${(3+r()*6).toFixed(0)}" fill="#1a2116"/>`}
+  if(f.creek) s+=`<path d="${f.creek}" fill="none" stroke="#4d7487" stroke-width="4" opacity=".8"/>`;
+  if(f.dam) s+=`<circle cx="${f.dam[0]}" cy="${f.dam[1]}" r="${f.dam[2]}" fill="#3e6274"/>`;
+  s+=`<rect width="360" height="240" fill="#0d1014" opacity=".28"/>`;
+  f.paddocks.forEach(p=>{
+    const pts=p.pts.map(q=>q.join(',')).join(' ');
+    s+=`<polygon points="${pts}" fill="${p.issue?'rgba(255,91,79,.12)':'rgba(60,141,255,.06)'}" stroke="rgba(255,255,255,.7)" stroke-width="1.2" stroke-linejoin="round"/>`;
+  });
+  if(full){
+    const cs=f.paddocks.map(p=>centroid(p.pts));
+    const route=[[f.dock.x,f.dock.y],...cs,[f.dock.x,f.dock.y]].map(q=>q.join(',')).join(' ');
+    s+=`<polyline points="${route}" fill="none" stroke="#3C8DFF" stroke-width="1.6" stroke-dasharray="5 4" opacity=".9"/>`;
+    f.paddocks.forEach((p,i)=>{const c=cs[i];s+=`<text x="${c[0]}" y="${c[1]-10}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" style="font-family:var(--font);paint-order:stroke" stroke="rgba(0,0,0,.6)" stroke-width="3">${p.n}</text><text x="${c[0]}" y="${c[1]+6}" text-anchor="middle" font-size="13" font-weight="700" fill="${p.c<p.y?'#F2A33A':'#fff'}" style="font-family:var(--num);paint-order:stroke" stroke="rgba(0,0,0,.6)" stroke-width="3">${p.c} hd</text>`});
+    f.troughs.forEach(t=>{const col=t.v<30?'#FF5B4F':t.v<50?'#F2A33A':'#5FB3FF';s+=`<circle cx="${t.x}" cy="${t.y}" r="5" fill="${col}" stroke="#fff" stroke-width="1.4"/>`});
+  }
+  if(f.fenceIssue){const g=f.fenceIssue.seg;s+=`<line x1="${g[0][0]}" y1="${g[0][1]}" x2="${g[1][0]}" y2="${g[1][1]}" stroke="#FF5B4F" stroke-width="5" stroke-linecap="round"/>`;
+    if(full){const mx=(g[0][0]+g[1][0])/2,my=(g[0][1]+g[1][1])/2;s+=`<circle class="pulse" cx="${mx-2}" cy="${my}" r="12" fill="none" stroke="#FF5B4F" stroke-width="2"/>`}}
+  if(full) f.troughs.filter(t=>t.v<30).forEach(t=>{s+=`<circle class="pulse" cx="${t.x}" cy="${t.y}" r="12" fill="none" stroke="#FF5B4F" stroke-width="2"/>`});
+  s+=`<g transform="translate(${f.dock.x-9},${f.dock.y-9})"><rect width="18" height="18" rx="4" fill="#3C8DFF" stroke="#fff" stroke-width="1.4"/><path d="M5 7h8M5 11h8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></g>`;
+  return s+'</svg>';
+}
+
+/* ---------- farms list ---------- */
+function renderFarms(){
+  const fs=visible();
+  const head=fs.reduce((a,f)=>a+f.counted,0), al=fs.reduce((a,f)=>a+f.alerts.length,0);
+  let h=`<div class="head" style="padding-top:12px"><h1 class="h1">${fs.length>1?'Farms':'Your farm'}</h1><p class="meta">Thursday 8 October. ${fs.length>1?`${fs.length} farms, ${fs.length} docks.`:'1 dock.'}</p></div>`;
+  h+=`<div class="summary"><div><b>${head}</b><span>Cattle counted</span></div><div><b class="${al?'c-crit':''}">${al}</b><span>Alerts</span></div><div><b>${fs.filter(f=>f.status!=='fly'&&f.status!=='warn').length}/${fs.length}</b><span>Runs done</span></div></div>`;
+  h+=`<div class="sect">`;
+  fs.forEach(f=>{
+    h+=`<button class="fcard" data-farm="${f.id}" id="card-${f.id}"><div class="thumb">${mapSVG(f,'thumb')}</div><div class="info"><div class="row-between"><span class="nm">${f.name}</span></div><span class="st ${f.status}">${f.statusText}</span><div class="ln"><span>Cattle</span><b>${f.counted} of ${f.head}</b></div><div class="ln"><span>${f.run.replace(/, \d+ min/,'')}</span></div></div></button>`;
+  });
+  h+=`</div>`;
+  $('#farmsScroll').innerHTML=h;
+}
+
+/* ---------- farm detail ---------- */
+let cur=null, seg='overview';
+function spark(data,color,min,max){
+  const W=300,H=58,p=6,n=data.length,x=i=>p+i*(W-2*p)/(n-1),y=v=>H-p-(v-min)/(max-min)*(H-2*p);
+  const d=data.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+  return `<svg class="spark" viewBox="0 0 300 58"><path d="M${p} ${H-p}H${W-p}" stroke="rgba(255,255,255,.1)"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(n-1)}" cy="${y(data[n-1])}" r="4" fill="${color}"/></svg><div class="axis"><span>Fri</span><span>Today</span></div>`;
+}
+const troughPhoto=`<svg class="photo" viewBox="0 0 358 190"><rect width="358" height="190" fill="#56633a"/><g fill="#4a5732"><circle cx="40" cy="34" r="30"/><circle cx="320" cy="160" r="40"/><circle cx="80" cy="170" r="26"/></g><path d="M0 132 Q90 112 180 128 T358 118" stroke="#8a7b56" stroke-width="20" fill="none" opacity=".55"/><circle cx="178" cy="92" r="48" fill="#868a8b"/><circle cx="178" cy="92" r="41" fill="#565b51"/><ellipse cx="178" cy="104" rx="28" ry="15" fill="#4a7488"/><rect x="124" y="38" width="108" height="108" fill="none" stroke="#3C8DFF" stroke-width="2"/><rect x="124" y="22" width="88" height="16" fill="#3C8DFF"/><text x="129" y="34" font-size="11" font-weight="700" fill="#fff" style="font-family:var(--num)">TROUGH 3  18%</text><g fill="#33251b"><ellipse cx="270" cy="76" rx="13" ry="6" transform="rotate(-20 270 76)"/><ellipse cx="70" cy="116" rx="13" ry="6" transform="rotate(15 70 116)"/></g></svg>`;
+const fencePhoto=`<svg class="photo" viewBox="0 0 358 190"><rect width="358" height="190" fill="#62703f"/><g fill="#525f34"><circle cx="60" cy="40" r="34"/><circle cx="300" cy="150" r="42"/></g><path d="M0 78 L132 82M0 100 L132 103" stroke="#dcd7c6" stroke-width="2"/><path d="M132 82 Q158 122 172 156M132 103 Q150 136 156 166" stroke="#dcd7c6" stroke-width="2" fill="none"/><path d="M222 86 L358 90M222 107 L358 110" stroke="#dcd7c6" stroke-width="2"/><g fill="#4f3e2a"><rect x="129" y="66" width="6" height="46"/><rect x="219" y="70" width="6" height="46"/></g><rect x="116" y="56" width="124" height="114" fill="none" stroke="#FF5B4F" stroke-width="2"/><rect x="116" y="40" width="96" height="16" fill="#FF5B4F"/><text x="121" y="52" font-size="11" font-weight="700" fill="#fff" style="font-family:var(--num)">WIRE DOWN  0.86</text></svg>`;
+
+function renderFarm(){
+  const f=cur;
+  const lowT=f.troughs.filter(t=>t.v<30).length, warnT=f.troughs.filter(t=>t.v>=30&&t.v<50).length;
+  let h=`<div class="nav"><button class="back" data-back><svg width="11" height="19"><use href="#back"/></svg>${visible().length>1?'Farms':'Your farm'}</button></div>`;
+  h+=`<div class="head"><div class="row-between"><h1 class="h1">${f.name}</h1><span class="st ${f.status}">${f.statusText}</span></div><p class="meta">${f.region}. ${f.run}.</p></div>`;
+  h+=`<div class="mapwrap">${mapSVG(f,'full')}<span class="mapchip tl">${ico('dock','c-acc')}${f.dock.state}</span><span class="mapchip br">${f.fenceKm} km fence</span></div>`;
+  const tabs=[['overview','Overview'],['cattle','Cattle'],['water','Water'],['feed','Feed'],['fence','Fence']];
+  h+=`<div class="utabs" id="utabs">${tabs.map(t=>`<button data-seg="${t[0]}" id="seg-${t[0]}" class="${seg===t[0]?'on':''}">${t[1]}</button>`).join('')}</div>`;
+
+  if(seg==='overview'){
+    if(f.status==='fly') h+=`<div class="banner fly"><span><b>Today's run is in progress.</b> These are yesterday's results until it lands, at about 6:40am.<br><button class="lnk" data-tab="live">Watch live</button></span></div>`;
+    if(f.status==='warn') h+=`<div class="banner warn"><span><b>Today's run is on hold.</b> Wind gusts are 41 km/h. The dock will try again at 9:00am. These are yesterday's results.</span></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>Needs attention</span></div><div class="panel rows">`;
+    const crit=f.alerts.filter(a=>a.lvl==='crit');
+    if(crit.length) crit.forEach(a=>{h+=`<button class="r" data-seg="${a.seg}">${ico('warn','c-crit')}<span class="main">${a.t}<small>${a.s}</small></span>${chev}</button>`});
+    else h+=`<div class="r">${ico('ok','c-ok')}<span class="main">Nothing needs you today</span></div>`;
+    h+=`</div></div>`;
+    const dc=f.counted-f.paddocks.reduce((a,p)=>a+p.y,0);
+    h+=`<div class="sect"><div class="tiles">
+      <button class="tile" data-seg="cattle" id="tile-cattle"><span class="lbl">Cattle</span><span class="big">${f.counted}<small> /${f.head}</small></span><span class="sub ${dc<0?'c-warn':'c-sec'}">${dc<0?'−'+Math.abs(dc)+' since yesterday':dc>0?'+'+dc+' since yesterday':'Same as yesterday'}</span></button>
+      <button class="tile" data-seg="water" id="tile-water"><span class="lbl">Water</span><span class="big">${f.troughs.length-lowT}<small> of ${f.troughs.length} OK</small></span><span class="sub ${lowT?'c-crit':warnT?'c-warn':'c-sec'}">${lowT?lowT+' trough low':warnT?warnT+' trough dropping':'All troughs fine'}</span></button>
+      <button class="tile" data-seg="feed" id="tile-feed"><span class="lbl">Feed</span><span class="big">${Math.min(...f.bunks.map(b=>b.days))}<small> days left</small></span><span class="sub c-sec">${f.bunks[0].n} runs out first</span></button>
+      <button class="tile" data-seg="fence" id="tile-fence"><span class="lbl">Fence</span><span class="big">${f.fenceKm}<small> km</small></span><span class="sub ${f.fenceIssue?'c-crit':'c-sec'}">${f.fenceIssue?'1 possible break':'No breaks found'}</span></button>
+    </div></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>Heat and welfare</span></div><div class="panel rows"><div class="r">${ico('sun',f.heat>=30?'c-warn':'c-sec')}<span class="main">Heat index at midday</span><span class="val ${f.heat>=30?'c-warn':''}">${f.heat}°C</span></div>`;
+    h+= f.welfare?`<div class="r">${ico('flag','c-warn')}<span class="main">1 animal to check<small>${f.welfare.replace('1 animal ','').replace(/^./,c=>c.toUpperCase())}</small></span></div>`:`<div class="r">${ico('ok','c-ok')}<span class="main">No animals flagged</span></div>`;
+    h+=`</div><p class="note">Flags come from the thermal camera. They point to an animal worth a look, not a diagnosis.</p></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>Dock</span></div><div class="panel rows"><div class="r">${ico('dock','c-acc')}<span class="main">Dock 1<small>${f.dock.state}</small></span></div><div class="r"><span class="main">Next run</span><span class="val">${f.dock.next}</span></div><div class="r">${ico('wind',/41/.test(f.dock.wind)?'c-warn':'c-sec')}<span class="main">Wind</span><span class="val">${f.dock.wind}</span></div></div></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>Since yesterday</span></div><div class="panel rows">${f.changes.map(c=>`<div class="r"><span class="main">${c[0]}</span><span class="val ${c[2]?'c-'+c[2]:''}">${c[1]}</span></div>`).join('')}</div></div>`;
+  }
+  if(seg==='cattle'){
+    const min=Math.min(...f.hist)-2,max=Math.max(...f.hist)+1;
+    h+=`<div class="sect"><div class="panel" style="padding:14px"><div class="bigline"><b>${f.counted}</b><span>of ${f.head} counted with the thermal camera</span></div>${spark(f.hist,f.counted<f.head?'#F2A33A':'#3C8DFF',min,max)}</div></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>By paddock</span></div><div class="panel"><table><tr><th>Paddock</th><th>Today</th><th>Yesterday</th><th>Change</th></tr>`;
+    f.paddocks.forEach(p=>{const d=p.c-p.y;h+=`<tr><td>${p.n}</td><td>${p.c}</td><td>${p.y}</td><td class="${d<0?'c-crit':d>0?'c-ok':'c-sec'}">${d>0?'+'+d:d<0?'−'+Math.abs(d):'0'}</td></tr>`});
+    const ty=f.paddocks.reduce((a,p)=>a+p.y,0);
+    h+=`<tr class="total"><td>Total</td><td>${f.counted}</td><td>${ty}</td><td class="${f.counted<ty?'c-crit':'c-sec'}">${f.counted<ty?'−'+(ty-f.counted):'0'}</td></tr></table></div>`;
+    if(f.id==='patty') h+=`<p class="note">Back Hill is 3 down and has a possible fence break, so some may have pushed through. Tomorrow's run counts Back Hill first.</p>`;
+    h+=`</div>`;
+  }
+  if(seg==='water'){
+    const low=f.troughs.find(t=>t.photo);
+    if(low) h+=`<div class="sect"><div class="stitle"><span>${low.n}, ${low.p}</span><span class="c-crit">${low.v}%</span></div><div class="panel">${troughPhoto}<div style="padding:12px 14px">${spark([74,72,75,73,71,71,18],'#FF5B4F',0,100)}</div></div><p class="note">Dropped from ${low.prev}% to ${low.v}% overnight. That usually means a stuck float valve or a leak.</p></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>All troughs</span><span>Checked 5:51am</span></div><div class="panel rows">`;
+    f.troughs.forEach(t=>{const c=t.v<30?'crit':t.v<50?'warn':'';h+=`<div class="r"><span class="main">${t.n}, ${t.p}<div class="meter"><i class="${c}" style="width:${t.v}%"></i></div></span><span class="val ${c?'c-'+c:''}">${t.v}%</span></div>`});
+    h+=`</div></div>`;
+  }
+  if(seg==='feed'){
+    h+=`<div class="sect"><div class="stitle"><span>Bunks</span><span>3D scan 5:56am</span></div><div class="panel rows">`;
+    f.bunks.forEach(b=>{const c=b.days<=2?'warn':'';h+=`<div class="r"><span class="main">${b.n}, ${b.p}<small>About ${b.days} days left</small><div class="meter"><i class="${c}" style="width:${b.pct}%"></i></div></span><span class="val">${b.m3} m³</span></div>`});
+    h+=`</div><p class="note">Days left are worked out from how much was eaten over the last 7 days.</p></div>`;
+  }
+  if(seg==='fence'){
+    if(f.fenceIssue) h+=`<div class="sect"><div class="stitle"><span>${f.fenceIssue.p}, east side</span><span class="c-crit">Possible break</span></div><div class="panel">${fencePhoto}</div><p class="note">The top and middle wires look loose between two posts. Photo taken at 6:07am.</p></div>`;
+    h+=`<div class="sect"><div class="stitle"><span>Fence line by paddock</span><span>${f.fenceKm} km flown</span></div><div class="panel rows">`;
+    f.paddocks.forEach(p=>{const bad=f.fenceIssue&&f.fenceIssue.p===p.n;h+=`<div class="r">${ico(bad?'warn':'ok',bad?'c-crit':'c-ok')}<span class="main">${p.n}</span><span class="val ${bad?'c-crit':'c-sec'}" style="font-family:var(--font);font-size:14px">${bad?'1 possible break':'No breaks'}</span></div>`});
+    h+=`</div></div>`;
+  }
+  $('#farmScroll').innerHTML=h;
+}
+function openFarm(id,s){ cur=byId(id); seg=s||'overview'; renderFarm(); go('farm'); }
+function setSeg(s){ seg=s; const sc=$('#farmScroll'), keep=sc.scrollTop, tabTop=$('#utabs').offsetTop; renderFarm(); sc.scrollTop=Math.min(keep,tabTop); }
+
+/* ---------- alerts ---------- */
+let filter='all';
+function renderAlerts(){
+  const fs=visible(); const total=fs.reduce((a,f)=>a+f.alerts.length,0);
+  let h=`<div class="head" style="padding-top:12px"><h1 class="h1">Alerts</h1><p class="meta">Urgent alerts are also sent by text.</p></div>`;
+  if(fs.length>1) h+=`<div class="filters">${[['all','All farms',total],...fs.map(f=>[f.id,f.name,f.alerts.length])].map(x=>`<button data-filter="${x[0]}" id="flt-${x[0]}" class="${filter===x[0]?'on':''}">${x[1]}${x[2]?' '+x[2]:''}</button>`).join('')}</div>`;
+  fs.filter(f=>filter==='all'||f.id===filter).forEach(f=>{
+    h+=`<div class="sect"><div class="stitle"><span>${f.name}</span><span class="st ${f.status}" style="padding:2px 7px">${f.statusText}</span></div><div class="panel rows">`;
+    if(f.alerts.length) f.alerts.forEach(a=>{h+=`<button class="r" data-farm="${f.id}" data-farmseg="${a.seg}">${ico(a.lvl==='crit'?'warn':'wind',a.lvl==='crit'?'c-crit':'c-warn')}<span class="main">${a.t}<small>${a.s}</small></span><span class="val c-sec" style="font-size:13px">${a.time}</span>${chev}</button>`});
+    else h+=`<div class="r">${ico('ok','c-ok')}<span class="main">${f.status==='fly'?'No alerts so far today':'No alerts today'}</span></div>`;
+    h+=`</div></div>`;
+  });
+  h+=`<div class="sect"><div class="stitle"><span>Who gets texts</span></div><div class="panel rows">${view==='ops'?`<div class="r"><span class="main">Each farm owner</span><span class="val c-sec" style="font-family:var(--font);font-size:14px">Alerts and summary</span></div><div class="r"><span class="main">Muster operations</span><span class="val c-sec" style="font-family:var(--font);font-size:14px">Everything</span></div>`:`<div class="r"><span class="main">Patty</span><span class="val c-sec" style="font-family:var(--font);font-size:14px">Alerts and summary</span></div><div class="r"><span class="main">Rob</span><span class="val c-sec" style="font-family:var(--font);font-size:14px">Alerts only</span></div>`}</div><p class="note">A weekly report is emailed every Monday.</p></div>`;
+  $('#alertsScroll').innerHTML=h;
+}
+
+/* ---------- live ---------- */
+let liveFarm=null, cam='wide';
+function renderLive(){
+  const fs=visible();
+  if(!liveFarm||!fs.includes(liveFarm)) liveFarm=fs.find(f=>f.status==='fly')||fs[0];
+  const flying=liveFarm.status==='fly';
+  $('#picker').innerHTML=fs.map(f=>`<button data-live="${f.id}" class="${f===liveFarm?'on':''}"><span class="dot ${f.status==='fly'?'fly':''}"></span>${f.name}</button>`).join('');
+  $('#recLbl').classList.toggle('replay',!flying);
+  $('#recTxt').textContent=flying?'LIVE':'REPLAY 5:42am';
+  const steps=[['Count cattle (thermal)','done'],['Check troughs','done'],['Scan feed bunks',flying?'now':'done'],['Fly fence line',flying?'todo':'done']];
+  $('#routeRows').innerHTML=steps.map(s=>`<div class="r"><span class="step">${s[1]==='done'?'<svg width="18" height="18" class="c-ok"><use href="#ok"/></svg>':s[1]==='now'?'<span class="spin"></span>':'<span class="ring"></span>'}</span><span class="main ${s[1]==='todo'?'c-sec':''}">${s[0]}</span></div>`).join('');
+  $('#pct').textContent=flying?'64%':'Finished 6:18am';
+  $('.camtabs .sp').textContent='';
+  // minimap
+  const f=liveFarm, sc=96/360;
+  let m=`<rect width="360" height="240" fill="#26301f"/><g>`;$('#mini').setAttribute('viewBox','0 0 360 240');$('#mini').setAttribute('preserveAspectRatio','xMidYMid slice');
+  f.paddocks.forEach(p=>{m+=`<polygon points="${p.pts.map(q=>q.join(',')).join(' ')}" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="3"/>`});
+  const cs=f.paddocks.map(p=>centroid(p.pts)); const pts=[[f.dock.x,f.dock.y],...cs];
+  const d='M'+pts.map(q=>q.join(' ')).join(' L ');
+  m+=`<path id="rp" d="${d}" fill="none" stroke="#3C8DFF" stroke-width="5" stroke-dasharray="10 8"/><circle r="11" fill="#fff" stroke="#3C8DFF" stroke-width="5"><animateMotion dur="24s" repeatCount="indefinite" path="${d}"/></circle></g>`;
+  $('#mini').innerHTML=m;
+}
+function setCam(c){cam=c;document.querySelectorAll('#camtabs [data-cam]').forEach(b=>b.classList.toggle('on',b.dataset.cam===c));$('#camLbl').textContent=c==='ir'?'IR':'WIDE';}
+
+const cv=$('#cv'), cx=cv.getContext('2d'); let raf=0,t0=0;
+function makeBg(ir){
+  const c=document.createElement('canvas');c.width=600;c.height=1600;const g=c.getContext('2d');const r=rnd(3);
+  g.fillStyle=ir?'#17132b':'#5d6d3b';g.fillRect(0,0,600,1600);
+  for(let i=0;i<300;i++){g.fillStyle=ir?`rgba(${40+r()*30},${24+r()*20},${78+r()*40},.45)`:`rgba(${74+r()*40},${88+r()*32},${44+r()*22},.42)`;g.beginPath();g.arc(r()*600,r()*1600,10+r()*42,0,7);g.fill()}
+  g.strokeStyle=ir?'rgba(105,68,128,.6)':'rgba(160,142,102,.65)';g.lineWidth=22;g.beginPath();g.moveTo(80,0);g.bezierCurveTo(210,400,40,800,180,1600);g.stroke();
+  g.strokeStyle=ir?'rgba(150,115,180,.6)':'rgba(225,220,205,.75)';g.lineWidth=2;g.beginPath();g.moveTo(520,0);g.lineTo(540,1600);g.stroke();
+  for(let i=0;i<10;i++){const x=r()*480,y=r()*1600,s=26+r()*30;g.fillStyle=ir?'rgba(55,38,96,.9)':'rgba(44,60,28,.9)';g.beginPath();g.arc(x,y,s,0,7);g.fill()}
+  g.fillStyle=ir?'#2f2658':'#858a8b';g.beginPath();g.arc(380,520,34,0,7);g.fill();g.fillStyle=ir?'#0c0a20':'#4b7a90';g.beginPath();g.arc(380,520,26,0,7);g.fill();
+  return c;
+}
+const bgW=makeBg(false),bgI=makeBg(true),R=rnd(7);
+const cows=[...Array(48)].map(()=>({x:60+R()*420,y:R()*1600,a:R()*6.28,s:.08+R()*.16,c:R()<.6?'#2a1f19':(R()<.5?'#583923':'#866548')}));
+function pad(n){return String(n).padStart(2,'0')}
+function draw(ts){
+  if(!t0)t0=ts;const t=(ts-t0)/1000;
+  const pan=(t*20)%800,bg=cam==='ir'?bgI:bgW;
+  cx.drawImage(bg,0,pan,600,800,0,0,600,800);
+  let n=0;cx.lineWidth=2;
+  cows.forEach(k=>{
+    k.a+=Math.sin(t*.7+k.x)*.02;k.x+=Math.cos(k.a)*k.s;k.y+=Math.sin(k.a)*k.s;if(k.x<40||k.x>500)k.a+=Math.PI;
+    const sy=k.y-pan;if(sy<-20||sy>820)return;n++;
+    cx.save();cx.translate(k.x,sy);cx.rotate(k.a);
+    if(cam==='ir'){const gr=cx.createRadialGradient(0,0,2,0,0,18);gr.addColorStop(0,'#fffbe0');gr.addColorStop(.5,'#ffcf3a');gr.addColorStop(1,'rgba(255,90,40,0)');cx.fillStyle=gr;cx.beginPath();cx.ellipse(0,0,20,12,0,0,7);cx.fill()}
+    else{cx.fillStyle=k.c;cx.beginPath();cx.ellipse(0,0,15,8,0,0,7);cx.fill();cx.beginPath();cx.ellipse(15,0,5,4,0,0,7);cx.fill()}
+    cx.restore();
+    cx.strokeStyle='#3C8DFF';
+    const x0=k.x-20,y0=sy-18,w=40,h=36,l=8;
+    cx.beginPath();cx.moveTo(x0,y0+l);cx.lineTo(x0,y0);cx.lineTo(x0+l,y0);cx.moveTo(x0+w-l,y0);cx.lineTo(x0+w,y0);cx.lineTo(x0+w,y0+l);cx.moveTo(x0+w,y0+h-l);cx.lineTo(x0+w,y0+h);cx.lineTo(x0+w-l,y0+h);cx.moveTo(x0+l,y0+h);cx.lineTo(x0,y0+h);cx.lineTo(x0,y0+h-l);cx.stroke();
+  });
+  $('#countLbl').textContent='Cattle in view '+n;
+  const sec=17*60+12+Math.floor(t);$('#recTime').textContent=`00:${pad(Math.floor(sec/60))}:${pad(sec%60)}`;
+  $('#tAlt').textContent=(60+Math.sin(t*.8)*.3).toFixed(1);
+  $('#tHs').textContent=(8.2+Math.sin(t*.5)*.4).toFixed(1);
+  $('#tVs').textContent=(Math.sin(t*.9)*.2).toFixed(1);
+  $('#tD').textContent=Math.round(640+t*6.5);
+  $('#tB').textContent=Math.max(55,68-Math.floor(t/14))+'%';
+  raf=requestAnimationFrame(draw);
+}
+function startFeed(){if(!raf){t0=0;raf=requestAnimationFrame(draw)}}
+function stopFeed(){cancelAnimationFrame(raf);raf=0}
+
+/* ---------- sms & lock per view ---------- */
+function renderMessages(){
+  if(view==='patty'){
+    $('#notifText').textContent="Patty's farm: today's run is done. 184 of 186 cattle counted. Trough 3 is low.";
+    $('#thread').innerHTML=`<div class="stamp"><b>Wed</b> 6:21 am</div><div class="bub">Patty's farm: run finished 6:21am. 186 of 186 cattle counted. All 4 troughs OK. About 3 days of feed left in Bunk B. No fence issues.</div><div class="stamp"><b>Today</b> 5:51 am</div><div class="bub">Patty's farm: Trough 3 (Creek paddock) is at 18%. It was 71% yesterday, so check the float valve or look for a leak.</div><div class="stamp">6:18 am</div><div class="bub">Patty's farm: today's run is done.
+
+184 of 186 cattle counted, 3 fewer on Back Hill
+Trough 3 low at 18%
+Fence wire may be down on Back Hill, east side
+About 2 days of feed in Bunk B
+
+<span class="lnk" id="smslink" role="button" tabindex="0" data-go="login">muster.app/today</span></div>`;
+  } else {
+    $('#notifText').textContent='4 farms today. 2 alerts on Patty\'s farm, Bellwood Station on hold for wind.';
+    $('#thread').innerHTML=`<div class="stamp"><b>Today</b> 5:40 am</div><div class="bub">Bellwood Station: run postponed, gusts 41 km/h. The dock will retry at 9:00am.</div><div class="stamp">5:51 am</div><div class="bub">Patty's farm: Trough 3 (Creek paddock) is at 18%, down from 71%.</div><div class="stamp">6:09 am</div><div class="bub">Patty's farm: fence wire may be down on Back Hill, east side.</div><div class="stamp">6:19 am</div><div class="bub">Morning. Status for 4 farms:
+
+Patty's farm: done, 2 alerts
+Ridgeview: done, all clear
+Murray Creek: flying now
+Bellwood Station: on hold for wind
+
+<span class="lnk" id="smslink" role="button" tabindex="0" data-go="login">muster.app/today</span></div>`;
+  }
+  $('#codeMeta').textContent=`We texted a code to the number ending in ${VIEWS[view].phone}.`;
+  const fs=visible();
+  $('#badge').textContent=fs.reduce((a,f)=>a+f.alerts.length,0);
+  $('#liveDot').hidden=!fs.some(f=>f.status==='fly');
+}
+
+/* ---------- navigation ---------- */
+const screen=$('#screen'),sbar=$('#sbar'),tabs=$('#tabs');
+const tabScreens=['farms','live','alerts'];
+let current='lock',stack=[],touring=false,tourToken=0;
+function fit(){const f=$('#fit'),h=$('#holder'),p=$('#phone');if(document.body.classList.contains('bare')){p.style.transform='';return}const s=Math.min(1,f.clientHeight/844,f.clientWidth/390);h.style.width=390*s+'px';h.style.height=844*s+'px';p.style.transform='scale('+s+')'}
+addEventListener('resize',fit);fit();
+function setChrome(id){
+  sbar.classList.toggle('dark',id==='sms');
+  tabs.hidden=!(tabScreens.includes(id)||id==='farm');
+  const active=id==='farm'?(stack.includes('alerts')?'alerts':'farms'):id;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===active));
+  if(id==='live'){renderLive();startFeed()}else stopFeed();
+  if(id==='farms')renderFarms();
+  if(id==='alerts')renderAlerts();
+  if(id==='login')runLogin();
+  if(id==='code')runCode();
+}
+function go(id,opts={}){
+  if(id===current)return;
+  const from=document.getElementById(current),to=document.getElementById(id);
+  if(opts.tab){from.className='scr fade';to.className='scr'}
+  else{stack.push(current);to.style.transition='none';to.className='scr off-r';void to.offsetWidth;to.style.transition='';to.className='scr';from.className='scr off-l'}
+  current=id;setChrome(id);
+  const sc=to.querySelector('.scroll');if(sc)sc.scrollTop=0;
+}
+function back(){const prev=stack.pop();if(!prev)return;const from=document.getElementById(current),to=document.getElementById(prev);to.style.transition='none';to.className='scr off-l';void to.offsetWidth;to.style.transition='';to.className='scr';from.className='scr off-r';current=prev;setChrome(prev)}
+function tab(id){stack=[];if(current==='farm'){document.getElementById('farm').className='scr off-r'}go(id,{tab:true})}
+
+screen.addEventListener('click',e=>{
+  const q=s=>e.target.closest(s);
+  let el;
+  if(el=q('[data-back]')){back();return}
+  if(el=q('[data-tab]')){tab(el.dataset.tab);return}
+  if(el=q('[data-seg]')){setSeg(el.dataset.seg);return}
+  if(el=q('[data-farm]')){openFarm(el.dataset.farm,el.dataset.farmseg);return}
+  if(el=q('[data-filter]')){filter=el.dataset.filter;renderAlerts();return}
+  if(el=q('[data-live]')){liveFarm=byId(el.dataset.live);renderLive();return}
+  if(el=q('[data-cam]')){setCam(el.dataset.cam);return}
+  if(el=q('[data-go]')){go(el.dataset.go);if(el.id==='verify')stack=[];return}
+});
+screen.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='smslink')go('login')});
+
+let loginDone=false,codeDone=false;
+async function typeInto(el,f,text,mask){f.classList.add('focus');el.classList.add('caret');for(let i=1;i<=text.length;i++){el.textContent=mask?'•'.repeat(i):text.slice(0,i);await wait(48)}el.classList.remove('caret');f.classList.remove('focus')}
+async function runLogin(){if(loginDone)return;loginDone=true;$('#em').textContent='';$('#pw').textContent='';await wait(450);await typeInto($('#em'),$('#emF'),VIEWS[view].email);await typeInto($('#pw'),$('#pwF'),'xxxxxxxxxxxx',true)}
+async function runCode(){if(codeDone)return;codeDone=true;const cells=[...document.querySelectorAll('#otp div')];cells.forEach(c=>{c.textContent='';c.classList.remove('f')});await wait(900);const code='482915';for(let i=0;i<6;i++){cells[i].textContent=code[i];cells[i].classList.add('f');await wait(100)}}
+
+function reset(){
+  tourToken++;touring=false;$('#tourBtn').textContent='Play walkthrough';
+  stopFeed();setCam('wide');loginDone=false;codeDone=false;filter='all';liveFarm=null;cur=null;seg='overview';
+  $('#em').textContent='';$('#pw').textContent='';
+  document.querySelectorAll('#otp div').forEach(c=>{c.textContent='';c.classList.remove('f')});
+  document.querySelectorAll('.scr').forEach(s=>{s.style.transition='none';s.className='scr '+(s.id==='live'||s.id==='alerts'?'fade':'off-r')});
+  $('#lock').className='scr';void screen.offsetWidth;document.querySelectorAll('.scr').forEach(s=>s.style.transition='');
+  current='lock';stack=[];renderMessages();setChrome('lock');
+}
+$('#resetBtn').onclick=reset;
+$('#viewTog').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b)return;view=b.dataset.view;document.querySelectorAll('#viewTog button').forEach(x=>x.classList.toggle('on',x===b));reset()});
+function setBare(on){document.body.classList.toggle('bare',on);fit()}
+$('#bareBtn').onclick=()=>setBare(true);$('#exitBare').onclick=()=>setBare(false);
+addEventListener('keydown',e=>{if(e.key==='Escape')setBare(false)});
+
+/* ---------- walkthrough ---------- */
+function ripple(el){const sr=screen.getBoundingClientRect(),r=el.getBoundingClientRect(),sc=sr.width/screen.offsetWidth||1;const d=document.createElement('div');d.className='taprip';d.style.left=((r.left+r.width/2-sr.left)/sc)+'px';d.style.top=((r.top+r.height/2-sr.top)/sc)+'px';screen.appendChild(d);setTimeout(()=>d.remove(),550)}
+async function pause(ms,tok){await wait(ms);if(tok!==tourToken)throw 0}
+async function tap(sel,tok){if(tok!==tourToken)throw 0;const el=typeof sel==='string'?$(sel):sel;if(!el)return;if(el.closest('.scroll'))el.scrollIntoView({block:'nearest'});ripple(el);await pause(240,tok);el.click()}
+async function tour(){
+  reset();touring=true;const tok=++tourToken;$('#tourBtn').textContent='Stop walkthrough';
+  try{
+    await pause(2200,tok);
+    await tap('#notif',tok);await pause(3600,tok);
+    await tap('#smslink',tok);await pause(3300,tok);
+    await tap('#signin',tok);await pause(2300,tok);
+    await tap('#verify',tok);await pause(3200,tok);
+    await tap('#card-patty',tok);await pause(2600,tok);
+    const fs=$('#farmScroll');fs.scrollTop=360;await pause(2200,tok);fs.scrollTop=700;await pause(2200,tok);fs.scrollTop=0;await pause(900,tok);
+    await tap('#seg-cattle',tok);await pause(3000,tok);
+    await tap('#seg-water',tok);await pause(1200,tok);fs.scrollTop=420;await pause(2600,tok);
+    await tap('#seg-fence',tok);await pause(1200,tok);fs.scrollTop=420;await pause(2600,tok);
+    await tap('#seg-overview',tok);await pause(800,tok);
+    if(view==='ops'){await tap('#farm [data-back]',tok);await pause(1400,tok);await tap('#card-bell',tok);await pause(3200,tok);await tap('#farm [data-back]',tok);await pause(1000,tok)}
+    await tap('#tabLive',tok);await pause(4500,tok);
+    await tap('#camIr',tok);await pause(4200,tok);await tap('#camWide',tok);await pause(1400,tok);
+    await tap('#tabAlerts',tok);await pause(3000,tok);
+    if(view==='ops'){await tap('#flt-patty',tok);await pause(2200,tok);await tap('#flt-all',tok);await pause(1500,tok)}
+    await tap('.tab[data-tab="farms"]',tok);
+  }catch(e){}
+  if(tok===tourToken){touring=false;$('#tourBtn').textContent='Play walkthrough'}
+}
+$('#tourBtn').onclick=()=>{if(touring){tourToken++;touring=false;$('#tourBtn').textContent='Play walkthrough'}else tour()};
+reset();
+})();
+</script>
