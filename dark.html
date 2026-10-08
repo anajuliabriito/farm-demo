@@ -768,13 +768,13 @@ async function tour(){
 }
 $('#tourBtn').onclick=()=>{if(touring){tourToken++;touring=false;$('#tourBtn').textContent='Play walkthrough'}else tour()};
 reset();
-/* auto-start the walkthrough 20 seconds after the page loads, unless the visitor starts using it first */
-let autoLeft=20; const note=$('#autoNote');
+/* auto-start the walkthrough 5 seconds after the page loads, unless the visitor starts using it first */
+let autoLeft=5; const note=$('#autoNote');
 const autoTimer=setInterval(()=>{
   autoLeft--; note.textContent=autoLeft>0?`Walkthrough starts in ${autoLeft}s`:'';
   if(autoLeft<=0){clearInterval(autoTimer); if(!touring) tour();}
 },1000);
-note.textContent='Walkthrough starts in 20s';
+note.textContent='Walkthrough starts in 5s';
 function cancelAuto(e){ if(!e.isTrusted) return; clearInterval(autoTimer); note.textContent=''; }
 screen.addEventListener('pointerdown',cancelAuto,{once:true});
 document.querySelector('.controls').addEventListener('pointerdown',cancelAuto,{once:true});
