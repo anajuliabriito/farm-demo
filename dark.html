@@ -265,6 +265,7 @@ tr.total td{color:var(--ink)}
     <button class="link" id="tourBtn">Play walkthrough</button>
     <button class="link" id="resetBtn">Start again</button>
     <button class="link" id="bareBtn">Hide phone frame</button>
+    <span id="autoNote" style="color:var(--stage-ink);opacity:.7;font-size:13px;font-variant-numeric:tabular-nums"></span>
   </div>
   <div class="fit" id="fit">
     <div class="holder" id="holder">
@@ -767,5 +768,15 @@ async function tour(){
 }
 $('#tourBtn').onclick=()=>{if(touring){tourToken++;touring=false;$('#tourBtn').textContent='Play walkthrough'}else tour()};
 reset();
+/* auto-start the walkthrough 20 seconds after the page loads, unless the visitor starts using it first */
+let autoLeft=20; const note=$('#autoNote');
+const autoTimer=setInterval(()=>{
+  autoLeft--; note.textContent=autoLeft>0?`Walkthrough starts in ${autoLeft}s`:'';
+  if(autoLeft<=0){clearInterval(autoTimer); if(!touring) tour();}
+},1000);
+note.textContent='Walkthrough starts in 20s';
+function cancelAuto(e){ if(!e.isTrusted) return; clearInterval(autoTimer); note.textContent=''; }
+screen.addEventListener('pointerdown',cancelAuto,{once:true});
+document.querySelector('.controls').addEventListener('pointerdown',cancelAuto,{once:true});
 })();
 </script>
